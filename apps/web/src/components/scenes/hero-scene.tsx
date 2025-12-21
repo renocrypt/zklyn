@@ -36,13 +36,13 @@ const VOXEL_SIZE = 0.5;
 const VOXEL_GAP_SCALE = 0.85;
 
 const HERO_CAMERA = {
-  position: [2, 18, 24] as [number, number, number],
-  fov: 35,
+  position: [30, 18, 30] as [number, number, number],
+  fov: 30,
   near: 0.1,
   far: 1000,
 };
 
-const HERO_CAMERA_TARGET = [0, 0, 0] as [number, number, number];
+const HERO_CAMERA_TARGET = [0, +3.5, 0] as [number, number, number];
 
 function createSeededRng(seed: number) {
   let t = seed >>> 0;
