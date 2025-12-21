@@ -22,23 +22,11 @@ function createSeededRng(seed: number) {
 const palettes = {
   free: {
     sky: "#0b0f16",
-    frame: "#2a3448",
     neon: "#60d8ff",
-    accent: "#9dd9ff",
-    warm: "#f3b36b",
-    magenta: "#c084fc",
-    dreamyA: "#7ce6ff",
-    dreamyB: "#9b7cff",
   },
   premium: {
     sky: "#000000",
-    frame: "#2a3448",
     neon: "#f59e0b",
-    accent: "#fcd34d",
-    warm: "#c084fc",
-    magenta: "#e879f9",
-    dreamyA: "#fbd38d",
-    dreamyB: "#ff9edb",
   },
 };
 
@@ -111,7 +99,6 @@ type Voxel = {
   y: number;
   z: number;
   color: THREE.Color;
-  pulse: PulseType;
 };
 
 function NeonVoxelBonsai({
@@ -320,7 +307,7 @@ function NeonVoxelBonsai({
       minZ = Math.min(minZ, z);
       maxZ = Math.max(maxZ, z);
 
-      voxels.push({ x, y, z, color: payload.color, pulse: payload.pulse });
+      voxels.push({ x, y, z, color: payload.color });
       if (payload.pulse === "red") redPulse.push(index);
       if (payload.pulse === "green") greenPulse.push(index);
       index += 1;
@@ -658,13 +645,9 @@ function SceneRoot({
   return (
     <group ref={scene}>
       {variant === "free" ? (
-        <group>
-          <VoxelCassette reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
-        </group>
+        <VoxelCassette reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
       ) : (
-        <group>
-          <NeonVoxelBonsai reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
-        </group>
+        <NeonVoxelBonsai reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
       )}
     </group>
   );
