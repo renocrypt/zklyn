@@ -459,8 +459,8 @@ function NeonVoxelBonsai({
     const mesh = instanced.current;
     if (!mesh.instanceColor) return;
 
-    const pulseRedStrength = 1.4 + Math.sin(t * 3.0) * 0.7;
-    const pulseGreenStrength = 1.6 + Math.sin(t * 3.0 + 2.0) * 0.7;
+    const pulseRedStrength = 4.0 + Math.sin(t * 3.0) * 2.0;
+    const pulseGreenStrength = 4.0 + Math.sin(t * 3.0 + 2.0) * 2.0;
 
     const temp = new THREE.Color();
 
@@ -758,7 +758,7 @@ export default function PassScene({ variant, reducedMotion }: PassSceneProps) {
         }}
       >
         <color attach="background" args={[palette.sky]} />
-        <fog attach="fog" args={[palette.sky, 4.5, 9]} />
+        {variant === "free" && <fog attach="fog" args={[palette.sky, 4.5, 9]} />}
         <FrameLimiter fps={reducedMotion ? 12 : 24} active={active} />
         <Bloom
           active={active}
