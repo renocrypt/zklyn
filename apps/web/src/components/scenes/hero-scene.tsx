@@ -109,6 +109,80 @@ type Voxel = {
   color: number;
 };
 
+function IridescentDust({
+  reducedMotion,
+  pauseMotion,
+}: {
+  reducedMotion?: boolean;
+  pauseMotion?: boolean;
+}) {
+  const points = useRef<THREE.Points>(null!);
+
+  const { geometry, material } = useMemo(() => {
+    const rng = createSeededRng(13371337);
+    const count = 220;
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+    const color = new THREE.Color();
+
+    for (let i = 0; i < count; i += 1) {
+      const theta = rng() * Math.PI * 2;
+      const radius = 6 + rng() * 7;
+      const y = -2.2 + rng() * 6.2;
+
+      positions[i * 3] = Math.cos(theta) * radius;
+      positions[i * 3 + 1] = y;
+      positions[i * 3 + 2] = Math.sin(theta) * radius;
+
+      const hue = (0.55 + rng() * 0.35) % 1;
+      color.setHSL(hue, 0.85, 0.7);
+      colors[i * 3] = color.r;
+      colors[i * 3 + 1] = color.g;
+      colors[i * 3 + 2] = color.b;
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+    const material = new THREE.PointsMaterial({
+      size: 0.14,
+      sizeAttenuation: true,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.7,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+
+    return { geometry, material };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      geometry.dispose();
+      material.dispose();
+    };
+  }, [geometry, material]);
+
+  useFrame(({ clock }) => {
+    if (reducedMotion || pauseMotion) return;
+    const t = clock.getElapsedTime();
+    points.current.rotation.y = t * 0.06;
+    points.current.rotation.x = Math.sin(t * 0.2) * 0.04;
+    points.current.rotation.z = Math.cos(t * 0.18) * 0.03;
+  });
+
+  return (
+    <points
+      ref={points}
+      geometry={geometry}
+      material={material}
+      frustumCulled={false}
+    />
+  );
+}
+
 function VoxelRamen({
   reducedMotion,
   pauseMotion,
@@ -315,10 +389,10 @@ function VoxelRamen({
   useFrame(({ clock }) => {
     if (reducedMotion || pauseMotion) return;
     const t = clock.getElapsedTime();
+    ramen.current.rotation.x = 0;
     ramen.current.rotation.y = t * 0.16;
-    ramen.current.rotation.x = Math.PI / 7 + Math.sin(t * 0.3) * 0.02;
-    ramen.current.rotation.z = Math.PI / 18;
-    ramen.current.position.y = Math.sin(t * 0.7) * 0.4;
+    ramen.current.rotation.z = 0;
+    ramen.current.position.y = Math.sin(t * 0.7) * 0.32;
   });
 
   return (
@@ -328,16 +402,55 @@ function VoxelRamen({
         args={[geometry, material, voxels.length]}
         frustumCulled={false}
       />
+      <IridescentDust reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
     </group>
   );
 }
 
-function LightRig() {
+function LightRig({
+  reducedMotion,
+  pauseMotion,
+}: {
+  reducedMotion?: boolean;
+  pauseMotion?: boolean;
+}) {
+  const iridescent = useRef<THREE.PointLight>(null!);
+  const rim = useRef<THREE.PointLight>(null!);
+  const color = useMemo(() => new THREE.Color(), []);
+
+  useFrame(({ clock }) => {
+    if (reducedMotion || pauseMotion) return;
+    const t = clock.getElapsedTime();
+
+    const orbit = 18;
+    iridescent.current.position.set(
+      Math.cos(t * 0.45) * orbit,
+      18 + Math.sin(t * 0.25) * 3,
+      Math.sin(t * 0.45) * orbit
+    );
+
+    rim.current.position.set(
+      Math.cos(t * 0.22 + 1.2) * 22,
+      6 + Math.sin(t * 0.33) * 2,
+      Math.sin(t * 0.22 + 1.2) * 22
+    );
+
+    const hue = (t * 0.06) % 1;
+    iridescent.current.intensity = 0.95 + Math.sin(t * 0.8) * 0.15;
+    color.setHSL(hue, 0.9, 0.62);
+    iridescent.current.color.copy(color);
+
+    color.setHSL((hue + 0.5) % 1, 0.85, 0.62);
+    rim.current.color.copy(color);
+  });
+
   return (
     <>
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[20, 40, 20]} intensity={1.2} />
-      <directionalLight position={[-18, 16, -12]} intensity={0.35} color="#ffd2b8" />
+      <ambientLight intensity={0.55} />
+      <directionalLight position={[20, 40, 20]} intensity={1.05} color="#fff2e8" />
+      <directionalLight position={[-18, 16, -12]} intensity={0.3} color="#9ad5ff" />
+      <pointLight ref={iridescent} distance={120} intensity={0.95} />
+      <pointLight ref={rim} distance={140} intensity={0.55} />
     </>
   );
 }
@@ -372,7 +485,7 @@ export default function HeroScene({ reducedMotion }: HeroSceneProps) {
         <fog attach="fog" args={[palette.sky, 40, 90]} />
         <FrameLimiter fps={reducedMotion ? 12 : 24} active={active} />
         <CameraRig />
-        <LightRig />
+        <LightRig reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
         <VoxelRamen reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
       </Canvas>
     </div>
