@@ -7,7 +7,7 @@ if (!globalThis.TextEncoder) {
 }
 
 if (!globalThis.TextDecoder) {
-  globalThis.TextDecoder = TextDecoder;
+  globalThis.TextDecoder = TextDecoder as unknown as typeof globalThis.TextDecoder;
 }
 
 jest.mock("next/image", () => {
