@@ -1,28 +1,28 @@
-import '@testing-library/jest-dom'
+import "@testing-library/jest-dom";
 
-const { TextDecoder, TextEncoder } = require('util')
+import { TextDecoder, TextEncoder } from "util";
 
-if (!global.TextEncoder) {
-  global.TextEncoder = TextEncoder
+if (!globalThis.TextEncoder) {
+  globalThis.TextEncoder = TextEncoder;
 }
 
-if (!global.TextDecoder) {
-  global.TextDecoder = TextDecoder
+if (!globalThis.TextDecoder) {
+  globalThis.TextDecoder = TextDecoder;
 }
 
-jest.mock('next/image', () => {
-  const React = require('react')
+jest.mock("next/image", () => {
+  const React = jest.requireActual<typeof import("react")>("react");
   return {
     __esModule: true,
-    default: (props: any) =>
-      React.createElement('img', { ...props, alt: props.alt || '' }),
-  }
-})
+    default: (props: Record<string, unknown> & { alt?: string }) =>
+      React.createElement("img", { ...props, alt: props.alt ?? "" }),
+  };
+});
 
-jest.mock('next/dynamic', () => ({
+jest.mock("next/dynamic", () => ({
   __esModule: true,
   default: () => {
-    const DynamicComponent = () => null
-    return DynamicComponent
+    const DynamicComponent = () => null;
+    return DynamicComponent;
   },
-}))
+}));

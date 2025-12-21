@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Project config files (linting these is noisy + low value):
+    "jest.config.cjs",
   ]),
 ]);
 
