@@ -9,30 +9,31 @@ type HeroSceneProps = {
 };
 
 const palette = {
-  sky: "#0b0f16",
+  sky: "#050505",
 };
 
 const ramenPalette = {
-  BOWL_DARK: 0x1a1a1a,
-  BOWL_LIGHT: 0x2d2d2d,
-  RIM_ORANGE: 0xe07438,
-  BROTH_DEEP: 0x9e5b26,
-  BROTH_SURFACE: 0xcc7a36,
-  BROTH_LIGHT: 0xe89a4f,
-  NOODLE: 0xf2e8c4,
-  NOODLE_SHADOW: 0xd9cca1,
-  EGG_WHITE: 0xfdfdfd,
-  EGG_YOLK_CORE: 0xeaa223,
-  EGG_YOLK_OUTER: 0xfccf5e,
-  NORI: 0x1d1821,
-  ONION_LIGHT: 0x76c442,
-  ONION_DARK: 0x4da033,
-  CHOPSTICK_RED: 0xbf3030,
-  CHOPSTICK_DETAIL: 0xdddddd,
-  STEAM: 0xffffff,
-} as const;
+  bowlDark: 0x1a1a1a,
+  bowlHighlight: 0x2d2d2d,
+  bowlRim: 0xff6600,
+  brothDeep: 0xcc5500,
+  brothMid: 0xe68a00,
+  brothLight: 0xffaa00,
+  noodle: 0xffeecc,
+  noodleShadow: 0xddccaa,
+  eggWhite: 0xfcfcfc,
+  eggYolk: 0xffaa00,
+  eggYolkCenter: 0xffcc00,
+  nori: 0x2e1a36,
+  onion: 0x44cc44,
+  onionLight: 0x66ee66,
+  chopstick: 0xc41e3a,
+  chopstickHighlight: 0xe62e4c,
+  steam: 0xffffff,
+};
 
-type RamenKey = keyof typeof ramenPalette;
+const VOXEL_SIZE = 0.5;
+const VOXEL_GAP_SCALE = 0.95;
 
 function createSeededRng(seed: number) {
   let t = seed >>> 0;
@@ -101,128 +102,12 @@ function useSceneActivity() {
   return { containerRef, active: inView && isVisible && !isScrolling };
 }
 
-function InstancedVoxels({
-  geometry,
-  material,
-  matrices,
-}: {
-  geometry: THREE.BufferGeometry;
-  material: THREE.Material;
-  matrices: THREE.Matrix4[];
-}) {
-  const mesh = useRef<THREE.InstancedMesh>(null!);
-
-  useEffect(() => {
-    for (let i = 0; i < matrices.length; i += 1) {
-      mesh.current.setMatrixAt(i, matrices[i]);
-    }
-    mesh.current.instanceMatrix.needsUpdate = true;
-    mesh.current.computeBoundingSphere();
-  }, [matrices]);
-
-  return (
-    <instancedMesh
-      ref={mesh}
-      args={[geometry, material, matrices.length]}
-      frustumCulled={false}
-    />
-  );
-}
-
-type SteamParticle = {
-  baseX: number;
-  baseZ: number;
-  riseSpeed: number;
-  phase: number;
+type Voxel = {
+  x: number;
+  y: number;
+  z: number;
+  color: number;
 };
-
-function Steam({
-  voxelSize,
-  reducedMotion,
-  pauseMotion,
-}: {
-  voxelSize: number;
-  reducedMotion?: boolean;
-  pauseMotion?: boolean;
-}) {
-  const steamGeo = useMemo(
-    () => new THREE.BoxGeometry(voxelSize * 0.92, voxelSize * 0.92, voxelSize * 0.92),
-    [voxelSize]
-  );
-  const materials = useMemo(
-    () =>
-      Array.from(
-        { length: 8 },
-        () =>
-          new THREE.MeshBasicMaterial({
-            color: ramenPalette.STEAM,
-            transparent: true,
-            opacity: 0.35,
-          })
-      ),
-    []
-  );
-  const rng = useMemo(() => createSeededRng(20251221), []);
-  const particles = useMemo<SteamParticle[]>(
-    () =>
-      Array.from({ length: 8 }, () => ({
-        baseX: (rng() - 0.5) * 6 * voxelSize,
-        baseZ: (rng() - 0.5) * 6 * voxelSize,
-        riseSpeed: 0.3 + rng() * 0.35,
-        phase: rng() * Math.PI * 2,
-      })),
-    [rng, voxelSize]
-  );
-  const refs = useRef<Array<THREE.Mesh | null>>([]);
-
-  useEffect(() => {
-    return () => {
-      steamGeo.dispose();
-      materials.forEach((mat) => mat.dispose());
-    };
-  }, [materials, steamGeo]);
-
-  useFrame(({ clock }) => {
-    if (reducedMotion || pauseMotion) return;
-
-    const t = clock.getElapsedTime();
-    const baseY = 12 * voxelSize;
-    const rise = 10 * voxelSize;
-    const wiggle = 1.5 * voxelSize;
-
-    particles.forEach((particle, idx) => {
-      const mesh = refs.current[idx];
-      const mat = materials[idx];
-      if (!mesh || !mat) return;
-
-      const u = (t * particle.riseSpeed + particle.phase) % 1;
-      const y = baseY + u * rise;
-      mesh.position.y = y;
-      mesh.position.x =
-        particle.baseX + Math.sin(t * 2 + particle.phase) * wiggle;
-      mesh.position.z =
-        particle.baseZ + Math.cos(t * 1.5 + particle.phase) * wiggle;
-
-      mat.opacity = 0.35 * (1 - u);
-    });
-  });
-
-  return (
-    <group>
-      {particles.map((particle, idx) => (
-        <mesh
-          key={idx}
-          ref={(el) => {
-            refs.current[idx] = el;
-          }}
-          geometry={steamGeo}
-          material={materials[idx]}
-          position={[particle.baseX, 12 * voxelSize, particle.baseZ]}
-        />
-      ))}
-    </group>
-  );
-}
 
 function VoxelRamen({
   reducedMotion,
@@ -232,209 +117,216 @@ function VoxelRamen({
   pauseMotion?: boolean;
 }) {
   const ramen = useRef<THREE.Group>(null!);
-  const voxelSize = 0.12;
-  const cube = useMemo(
-    () => new THREE.BoxGeometry(voxelSize * 0.92, voxelSize * 0.92, voxelSize * 0.92),
-    [voxelSize]
-  );
+  const instanced = useRef<THREE.InstancedMesh>(null!);
 
-  const materials = useMemo(() => {
-    const standard = (color: number, roughness = 0.8, metalness = 0.1) =>
-      new THREE.MeshStandardMaterial({
-        color,
-        roughness,
-        metalness,
-        flatShading: true,
-      });
+  const { voxels, center } = useMemo(() => {
+    const rng = createSeededRng(20251221);
+    const data: Voxel[] = [];
 
-    return {
-      BOWL_DARK: standard(ramenPalette.BOWL_DARK, 0.9, 0.05),
-      BOWL_LIGHT: standard(ramenPalette.BOWL_LIGHT, 0.85, 0.05),
-      RIM_ORANGE: standard(ramenPalette.RIM_ORANGE, 0.75, 0.05),
-      BROTH_DEEP: standard(ramenPalette.BROTH_DEEP, 0.55, 0.02),
-      BROTH_SURFACE: standard(ramenPalette.BROTH_SURFACE, 0.45, 0.02),
-      BROTH_LIGHT: standard(ramenPalette.BROTH_LIGHT, 0.35, 0.01),
-      NOODLE: standard(ramenPalette.NOODLE, 0.85, 0.0),
-      NOODLE_SHADOW: standard(ramenPalette.NOODLE_SHADOW, 0.9, 0.0),
-      EGG_WHITE: standard(ramenPalette.EGG_WHITE, 0.75, 0.02),
-      EGG_YOLK_CORE: standard(ramenPalette.EGG_YOLK_CORE, 0.6, 0.02),
-      EGG_YOLK_OUTER: standard(ramenPalette.EGG_YOLK_OUTER, 0.65, 0.02),
-      NORI: standard(ramenPalette.NORI, 0.95, 0.0),
-      ONION_LIGHT: standard(ramenPalette.ONION_LIGHT, 0.8, 0.0),
-      ONION_DARK: standard(ramenPalette.ONION_DARK, 0.85, 0.0),
-      CHOPSTICK_RED: standard(ramenPalette.CHOPSTICK_RED, 0.75, 0.05),
-      CHOPSTICK_DETAIL: standard(ramenPalette.CHOPSTICK_DETAIL, 0.75, 0.05),
-    } satisfies Record<Exclude<RamenKey, "STEAM">, THREE.MeshStandardMaterial>;
-  }, []);
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
 
-  const instances = useMemo(() => {
-    const layers = Object.keys(ramenPalette).reduce(
-      (acc, key) => {
-        acc[key as RamenKey] = [];
-        return acc;
-      },
-      {} as Record<RamenKey, THREE.Matrix4[]>
-    );
-
-    const dummy = new THREE.Object3D();
-    const rng = createSeededRng(424242);
-    const add = (key: RamenKey, x: number, y: number, z: number) => {
-      dummy.position.set(x * voxelSize, y * voxelSize, z * voxelSize);
-      dummy.updateMatrix();
-      layers[key].push(dummy.matrix.clone());
+    const addVoxel = (x: number, y: number, z: number, color: number) => {
+      data.push({ x, y, z, color });
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+      minZ = Math.min(minZ, z);
+      maxZ = Math.max(maxZ, z);
     };
 
-    const bowlRadius = 14;
-    const bowlHeight = 10;
-    const rimHeight = 11;
+    const radius = 20;
+    const height = 14;
+    const liquidLevel = 8;
 
-    for (let y = 0; y <= rimHeight; y += 1) {
-      for (let x = -bowlRadius - 2; x <= bowlRadius + 2; x += 1) {
-        for (let z = -bowlRadius - 2; z <= bowlRadius + 2; z += 1) {
+    for (let y = 0; y <= height; y += 1) {
+      for (let x = -radius - 2; x <= radius + 2; x += 1) {
+        for (let z = -radius - 2; z <= radius + 2; z += 1) {
           const dist = Math.hypot(x, z);
-          const currentRadius = bowlRadius * (0.6 + 0.4 * (y / bowlHeight));
+          const currentRadius = 8 + (y / height) * 12;
+          const thickness = 1.5;
 
-          if (dist <= currentRadius && dist >= currentRadius - 1.5) {
-            if (y === rimHeight) add("RIM_ORANGE", x, y, z);
-            else add(rng() > 0.8 ? "BOWL_LIGHT" : "BOWL_DARK", x, y, z);
-          } else if (y === 0 && dist < currentRadius) {
-            add("BOWL_DARK", x, y, z);
-          } else if (y > 0 && y < rimHeight - 1 && dist < currentRadius - 1.5) {
-            if (y === rimHeight - 2) {
-              let color: RamenKey = "BROTH_SURFACE";
-              if (dist > currentRadius - 3) color = "BROTH_DEEP";
-              if (rng() > 0.9) color = "BROTH_LIGHT";
-              add(color, x, y, z);
-            } else if (y >= rimHeight - 4) {
-              add("BROTH_DEEP", x, y, z);
+          if (dist <= currentRadius && dist > currentRadius - thickness) {
+            let col = ramenPalette.bowlDark;
+            if ((x + y + z) % 7 === 0) col = ramenPalette.bowlHighlight;
+            if (y === height) col = ramenPalette.bowlRim;
+            if (y === height - 1 && dist > currentRadius - 0.5) col = ramenPalette.bowlRim;
+            addVoxel(x, y, z, col);
+          } else if (y === 0 && dist <= 8) {
+            addVoxel(x, y, z, ramenPalette.bowlDark);
+          }
+
+          if (y < liquidLevel && y > 1 && dist < currentRadius - thickness) {
+            if (y === liquidLevel - 1) {
+              let col = ramenPalette.brothMid;
+              if (dist < 5) col = ramenPalette.brothLight;
+              else if (dist > 12) col = ramenPalette.brothDeep;
+              addVoxel(x, y, z, col);
             }
           }
         }
       }
     }
 
-    const surfaceY = rimHeight - 1;
+    const numNoodles = 500;
+    const noodleCenterY = liquidLevel;
+    for (let i = 0; i < numNoodles; i += 1) {
+      const t = i * 0.1;
+      const r = 3 + t * 0.2;
+      if (r > 16) break;
 
-    for (let i = 0; i < 15; i += 1) {
-      const startX = (rng() - 0.5) * 16;
-      const startZ = (rng() - 0.5) * 16;
-      const freq = 0.5 + rng();
-      const amp = 1 + rng();
+      const nx = Math.cos(t) * r;
+      const nz = Math.sin(t) * r;
+      const x = Math.round(nx);
+      const z = Math.round(nz);
 
-      for (let t = 0; t < 10; t += 0.5) {
-        const nx = Math.floor(startX + t);
-        const nz = Math.floor(startZ + Math.sin(t * freq) * amp);
-        if (Math.hypot(nx, nz) < bowlRadius - 2) {
-          add("NOODLE", nx, surfaceY, nz);
-        }
+      if (x * x + z * z < 18 * 18) {
+        const ny = noodleCenterY + Math.sin(t * 3) * 0.5;
+        const col = rng() > 0.8 ? ramenPalette.noodleShadow : ramenPalette.noodle;
+        addVoxel(Math.round(x), Math.round(ny), Math.round(z), col);
       }
     }
 
-    const eggX = -5;
-    const eggZ = -4;
-    for (let x = -3; x <= 3; x += 1) {
-      for (let z = -3; z <= 3; z += 1) {
-        const d = Math.hypot(x, z);
-        if (d < 3) {
-          add("EGG_WHITE", eggX + x, surfaceY, eggZ + z);
-          if (d < 1.5) {
-            add(
-              d < 0.8 ? "EGG_YOLK_CORE" : "EGG_YOLK_OUTER",
-              eggX + x,
-              surfaceY + 1,
-              eggZ + z
-            );
-          } else {
-            add("EGG_WHITE", eggX + x, surfaceY + 1, eggZ + z);
+    const noriBaseX = -8;
+    const noriBaseZ = -8;
+    for (let i = 0; i < 10; i += 1) {
+      for (let j = 0; j < 8; j += 1) {
+        const nx = noriBaseX + i;
+        const nz = noriBaseZ - j * 0.5;
+        const ny = liquidLevel + j + rng() * 0.2;
+        addVoxel(Math.round(nx), Math.round(ny), Math.round(nz), ramenPalette.nori);
+      }
+    }
+
+    const eggX = 6;
+    const eggZ = 4;
+    const eggY = liquidLevel;
+    for (let x = -4; x <= 4; x += 1) {
+      for (let z = -4; z <= 4; z += 1) {
+        for (let y = 0; y <= 2; y += 1) {
+          const dist = Math.sqrt(x * x + z * z + (y * 2) * (y * 2));
+          if (dist < 3.5) {
+            let col = ramenPalette.eggWhite;
+            const yolkDist = Math.hypot(x, z);
+            if (yolkDist < 1.8 && y >= 0) {
+              col = yolkDist < 1.0 ? ramenPalette.eggYolkCenter : ramenPalette.eggYolk;
+            }
+            addVoxel(eggX + x, eggY + y, eggZ + z, col);
           }
         }
       }
     }
 
-    for (let u = 0; u < 6; u += 1) {
-      for (let v = 0; v < 7; v += 1) {
-        const nx = 4 + u;
-        const nz = 4 + v;
-        const ny = surfaceY + 1 + u * 0.5;
-        add("NORI", nx, Math.floor(ny), nz);
+    const numOnions = 40;
+    for (let i = 0; i < numOnions; i += 1) {
+      const angle = rng() * Math.PI * 2;
+      const r = rng() * 10;
+      const ox = Math.cos(angle) * r;
+      const oz = Math.sin(angle) * r;
+
+      if (rng() > 0.3) {
+        const col = rng() > 0.5 ? ramenPalette.onion : ramenPalette.onionLight;
+        addVoxel(Math.round(ox), liquidLevel + 1, Math.round(oz), col);
       }
     }
 
-    for (let i = 0; i < 12; i += 1) {
-      const ox = (rng() - 0.5) * 8;
-      const oz = (rng() - 0.5) * 8;
-      if (Math.hypot(ox, oz) < 10) {
-        add("ONION_LIGHT", Math.floor(ox), surfaceY + 1, Math.floor(oz));
-        add("ONION_DARK", Math.floor(ox) + 1, surfaceY + 1, Math.floor(oz));
+    const stickLen = 44;
+    for (let i = 0; i < stickLen; i += 1) {
+      const col = i > 35 ? ramenPalette.chopstickHighlight : ramenPalette.chopstick;
+      const s1x = -22 + i;
+      const s1z = 8;
+      const s1y = 15;
+      addVoxel(s1x, s1y, s1z, col);
+
+      const s2x = -22 + i;
+      const s2z = 10 + i * 0.05;
+      addVoxel(s2x, s1y, Math.round(s2z), col);
+    }
+
+    for (let s = 0; s < 3; s += 1) {
+      const steamBaseX = (rng() - 0.5) * 10;
+      const steamBaseZ = (rng() - 0.5) * 10;
+      const steamHeight = 15 + rng() * 10;
+
+      for (let y = 0; y < steamHeight; y += 1) {
+        if (rng() > 0.6) continue;
+        const wave = Math.sin(y * 0.5 + s);
+        const sx = steamBaseX + wave * 2;
+        const sz = steamBaseZ;
+        const sy = 20 + y;
+        addVoxel(Math.round(sx), Math.round(sy), Math.round(sz), ramenPalette.steam);
       }
     }
 
-    const csStart = { x: 18, y: 16, z: 8 };
-    const csEnd = { x: -8, y: 12, z: -8 };
-
-    const drawLine = (offsetZ: number) => {
-      const dx = csEnd.x - csStart.x;
-      const dy = csEnd.y - csStart.y;
-      const dz = csEnd.z - csStart.z;
-      const steps = Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz)) * 1.5;
-
-      for (let i = 0; i <= steps; i += 1) {
-        const t = i / steps;
-        const x = Math.floor(csStart.x + dx * t);
-        const y = Math.floor(csStart.y + dy * t);
-        const z = Math.floor(csStart.z + dz * t) + offsetZ;
-
-        let col: RamenKey = "CHOPSTICK_RED";
-        if (i < 5 || (i > 7 && i < 10)) col = "CHOPSTICK_DETAIL";
-
-        add(col, x, y, z);
-      }
+    const center = {
+      x: ((minX + maxX) / 2) * VOXEL_SIZE,
+      y: ((minY + maxY) / 2) * VOXEL_SIZE,
+      z: ((minZ + maxZ) / 2) * VOXEL_SIZE,
     };
 
-    drawLine(0);
-    drawLine(3);
+    return { voxels: data, center };
+  }, []);
 
-    return layers;
-  }, [voxelSize]);
+  const geometry = useMemo(
+    () => new THREE.BoxGeometry(VOXEL_SIZE * VOXEL_GAP_SCALE, VOXEL_SIZE * VOXEL_GAP_SCALE, VOXEL_SIZE * VOXEL_GAP_SCALE),
+    []
+  );
+  const material = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        roughness: 0.8,
+        metalness: 0.1,
+        flatShading: true,
+      }),
+    []
+  );
 
   useEffect(() => {
     return () => {
-      cube.dispose();
-      Object.values(materials).forEach((material) => material.dispose());
+      geometry.dispose();
+      material.dispose();
     };
-  }, [cube, materials]);
+  }, [geometry, material]);
+
+  useEffect(() => {
+    const mesh = instanced.current;
+    const dummy = new THREE.Object3D();
+    const color = new THREE.Color();
+
+    for (let i = 0; i < voxels.length; i += 1) {
+      const voxel = voxels[i];
+      dummy.position.set(voxel.x * VOXEL_SIZE, voxel.y * VOXEL_SIZE, voxel.z * VOXEL_SIZE);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+      color.setHex(voxel.color);
+      mesh.setColorAt(i, color);
+    }
+
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    mesh.computeBoundingSphere();
+  }, [voxels]);
 
   useFrame(({ clock }) => {
     if (reducedMotion || pauseMotion) return;
     const t = clock.getElapsedTime();
-    ramen.current.rotation.y = t * 0.2;
-    ramen.current.rotation.x = Math.PI / 12 + Math.sin(t * 0.3) * 0.03;
-    ramen.current.rotation.z = Math.PI / 24;
-    ramen.current.position.y = -0.8 + Math.sin(t * 0.8) * 0.08;
+    ramen.current.rotation.y = t * 0.16;
+    ramen.current.rotation.x = Math.PI / 7 + Math.sin(t * 0.3) * 0.02;
+    ramen.current.rotation.z = Math.PI / 18;
+    ramen.current.position.y = Math.sin(t * 0.7) * 0.4;
   });
 
-  const voxelLayers = useMemo(
-    () =>
-      (Object.keys(materials) as Array<Exclude<RamenKey, "STEAM">>).filter(
-        (key) => instances[key]?.length
-      ),
-    [instances, materials]
-  );
-
   return (
-    <group ref={ramen} position={[0, -0.7, 0]}>
-      {voxelLayers.map((key) => (
-        <InstancedVoxels
-          key={key}
-          geometry={cube}
-          material={materials[key]}
-          matrices={instances[key]}
-        />
-      ))}
-      <Steam
-        voxelSize={voxelSize}
-        reducedMotion={reducedMotion}
-        pauseMotion={pauseMotion}
+    <group ref={ramen} position={[-center.x, -center.y, -center.z]}>
+      <instancedMesh
+        ref={instanced}
+        args={[geometry, material, voxels.length]}
+        frustumCulled={false}
       />
     </group>
   );
@@ -444,8 +336,8 @@ function LightRig() {
   return (
     <>
       <ambientLight intensity={0.6} />
-      <directionalLight position={[4.5, 6.5, 4.5]} intensity={0.85} />
-      <directionalLight position={[-4, 2, -3]} intensity={0.35} color="#f5b8a1" />
+      <directionalLight position={[20, 40, 20]} intensity={1.2} />
+      <directionalLight position={[-18, 16, -12]} intensity={0.35} color="#ffd2b8" />
     </>
   );
 }
@@ -467,8 +359,7 @@ export default function HeroScene({ reducedMotion }: HeroSceneProps) {
   return (
     <div ref={containerRef} className="h-full w-full">
       <Canvas
-        orthographic
-        camera={{ position: [3.8, 3.8, 3.8], zoom: 90, near: 0.1, far: 100 }}
+        camera={{ position: [24, 28, 24], fov: 45, near: 0.1, far: 1000 }}
         dpr={[1, 1.2]}
         gl={{ alpha: true, antialias: false, powerPreference: "low-power" }}
         frameloop="demand"
@@ -478,6 +369,7 @@ export default function HeroScene({ reducedMotion }: HeroSceneProps) {
         }}
       >
         <color attach="background" args={[palette.sky]} />
+        <fog attach="fog" args={[palette.sky, 40, 90]} />
         <FrameLimiter fps={reducedMotion ? 12 : 24} active={active} />
         <CameraRig />
         <LightRig />
