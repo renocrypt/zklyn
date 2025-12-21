@@ -496,16 +496,6 @@ function SceneRoot({
 
   return (
     <group ref={scene}>
-      <mesh position={[0, -1.1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[6, 4]} />
-        <meshStandardMaterial color="#151a24" metalness={0.2} roughness={0.85} flatShading />
-      </mesh>
-
-      <mesh position={[0, 0.6, -1.4]} scale={[2.4, 1.3, 0.05]}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial color={palette.frame} flatShading />
-      </mesh>
-
       {variant === "free" ? (
         <group>
           <VoxelCassette reducedMotion={reducedMotion} pauseMotion={pauseMotion} />

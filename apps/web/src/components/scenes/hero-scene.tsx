@@ -461,16 +461,6 @@ function SceneRoot({
 
   return (
     <group ref={scene}>
-      <mesh position={[0, -1.2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[8, 6]} />
-        <meshStandardMaterial
-          color="#151a24"
-          metalness={0.3}
-          roughness={0.75}
-          flatShading
-        />
-      </mesh>
-
       {frames.map((frame) => (
         <FrameSegment
           key={frame.z}
