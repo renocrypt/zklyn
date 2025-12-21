@@ -33,7 +33,14 @@ const ramenPalette = {
 };
 
 const VOXEL_SIZE = 0.5;
-const VOXEL_GAP_SCALE = 0.95;
+const VOXEL_GAP_SCALE = 0.85;
+
+const HERO_CAMERA = {
+  position: [24, 22, 24] as [number, number, number],
+  fov: 35,
+  near: 0.1,
+  far: 1000,
+};
 
 function createSeededRng(seed: number) {
   let t = seed >>> 0;
@@ -496,8 +503,8 @@ function VoxelRamen({
   const material = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        roughness: 0.8,
-        metalness: 0.1,
+        roughness: 0.4,
+        metalness: 0.2,
         flatShading: true,
       }),
     []
@@ -533,9 +540,9 @@ function VoxelRamen({
     if (reducedMotion || pauseMotion) return;
     const t = clock.getElapsedTime();
     ramen.current.rotation.x = 0;
-    ramen.current.rotation.y = t * 0.16;
+    ramen.current.rotation.y = t * 0.10;
     ramen.current.rotation.z = 0;
-    ramen.current.position.y = Math.sin(t * 0.7) * 0.32;
+    ramen.current.position.y = -7.0 + Math.sin(t * 0.7) * 0.32;
   });
 
   return (
@@ -599,35 +606,42 @@ function LightRig({
   );
 }
 
-function CameraRig() {
-  const { camera } = useThree();
-
-  useEffect(() => {
-    camera.lookAt(0, 0, 0);
-  }, [camera]);
-
-  return null;
-}
-
 export default function HeroScene({ reducedMotion }: HeroSceneProps) {
   const { containerRef, active } = useSceneActivity();
   const pauseMotion = reducedMotion || !active;
+  const canvasKey = `${HERO_CAMERA.position.join(",")}-${HERO_CAMERA.fov}-${HERO_CAMERA.near}-${HERO_CAMERA.far}`;
 
   return (
     <div ref={containerRef} className="h-full w-full">
       <Canvas
-        camera={{ position: [24, 28, 24], fov: 45, near: 0.1, far: 1000 }}
+        key={canvasKey}
+        camera={HERO_CAMERA}
         dpr={[1, 1.2]}
         gl={{ alpha: true, antialias: false, powerPreference: "low-power" }}
         frameloop="demand"
-        onCreated={({ gl }) => {
+        onCreated={({ gl, camera }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
           gl.toneMappingExposure = 1.3;
+
+          camera.position.set(
+            HERO_CAMERA.position[0],
+            HERO_CAMERA.position[1],
+            HERO_CAMERA.position[2]
+          );
+
+          if ("isPerspectiveCamera" in camera && (camera as THREE.PerspectiveCamera).isPerspectiveCamera) {
+            const perspective = camera as THREE.PerspectiveCamera;
+            perspective.fov = HERO_CAMERA.fov;
+            perspective.near = HERO_CAMERA.near;
+            perspective.far = HERO_CAMERA.far;
+            perspective.updateProjectionMatrix();
+          }
+
+          camera.lookAt(0, 0, 0);
         }}
       >
         <color attach="background" args={[palette.sky]} />
         <FrameLimiter fps={reducedMotion ? 12 : 24} active={active} />
-        <CameraRig />
         <IridescentBackdrop reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
         <LightRig reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
         <VoxelRamen reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
