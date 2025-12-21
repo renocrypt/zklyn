@@ -3,9 +3,6 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
-import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
-import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
 type PassSceneProps = {
   variant: "free" | "premium";
@@ -54,67 +51,6 @@ function FrameLimiter({ fps, active }: { fps: number; active: boolean }) {
     const interval = setInterval(() => invalidate(), 1000 / fps);
     return () => clearInterval(interval);
   }, [active, fps, invalidate]);
-
-  return null;
-}
-
-function Bloom({
-  active,
-  bloomEnabled,
-  strength,
-  radius,
-  threshold,
-}: {
-  active: boolean;
-  bloomEnabled: boolean;
-  strength: number;
-  radius: number;
-  threshold: number;
-}) {
-  const { gl, scene, camera, size } = useThree();
-  const composer = useRef<EffectComposer | null>(null);
-  const bloomPass = useRef<UnrealBloomPass | null>(null);
-
-  useEffect(() => {
-    if (!bloomEnabled) {
-      bloomPass.current = null;
-      composer.current?.dispose();
-      composer.current = null;
-      return undefined;
-    }
-
-    const nextComposer = new EffectComposer(gl);
-    nextComposer.setPixelRatio(1);
-    nextComposer.addPass(new RenderPass(scene, camera));
-
-    const pass = new UnrealBloomPass(
-      new THREE.Vector2(size.width, size.height),
-      strength,
-      radius,
-      threshold
-    );
-    nextComposer.addPass(pass);
-
-    composer.current = nextComposer;
-    bloomPass.current = pass;
-
-    return () => {
-      bloomPass.current = null;
-      composer.current?.dispose();
-      composer.current = null;
-    };
-  }, [bloomEnabled, camera, gl, radius, scene, strength, threshold, size.height, size.width]);
-
-  useEffect(() => {
-    if (!bloomEnabled) return;
-    composer.current?.setSize(size.width, size.height);
-  }, [bloomEnabled, size.height, size.width]);
-
-  useFrame(() => {
-    if (!active) return;
-    if (bloomEnabled) composer.current?.render();
-    else gl.render(scene, camera);
-  }, 1);
 
   return null;
 }
@@ -743,11 +679,6 @@ export default function PassScene({ variant, reducedMotion }: PassSceneProps) {
       ? { position: [0, 0.2, 6.2] as [number, number, number], fov: 42 }
       : { position: [3.2, 2.4, 3.2] as [number, number, number], zoom: 70 };
 
-  const bloomConfig =
-    variant === "premium"
-      ? { strength: 0.55, radius: 0.6, threshold: 0.0 }
-      : { strength: 1.1, radius: 0.45, threshold: 0.22 };
-
   return (
     <div ref={containerRef} className="h-full w-full">
       <Canvas
@@ -769,13 +700,6 @@ export default function PassScene({ variant, reducedMotion }: PassSceneProps) {
         <color attach="background" args={[palette.sky]} />
         {variant === "free" && <fog attach="fog" args={[palette.sky, 4.5, 9]} />}
         <FrameLimiter fps={reducedMotion ? 12 : 24} active={active} />
-        <Bloom
-          active={active}
-          bloomEnabled={!reducedMotion}
-          strength={bloomConfig.strength}
-          radius={bloomConfig.radius}
-          threshold={bloomConfig.threshold}
-        />
         {variant === "premium" ? (
           <BonsaiLightRig reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
         ) : (
