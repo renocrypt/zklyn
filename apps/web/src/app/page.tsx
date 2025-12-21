@@ -497,7 +497,7 @@ export default function Home() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 text-sm text-muted-foreground">
-              <div className="h-48 overflow-hidden rounded-2xl border border-white/10 bg-black/40">
+              <div className="h-60 overflow-hidden rounded-2xl border border-white/10 bg-black/40">
                 <PassScene
                   variant="free"
                   reducedMotion={prefersReducedMotion}
@@ -527,7 +527,7 @@ export default function Home() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 text-sm text-muted-foreground">
-              <div className="h-48 overflow-hidden rounded-2xl border border-white/10 bg-black/40">
+              <div className="h-60 overflow-hidden rounded-2xl border border-white/10 bg-black/40">
                 <PassScene
                   variant="premium"
                   reducedMotion={prefersReducedMotion}
