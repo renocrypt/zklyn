@@ -10,19 +10,39 @@ type HeroSceneProps = {
 
 const palette = {
   sky: "#0b0f16",
-  bridge: "#1b2232",
-  frame: "#2a3448",
-  windowWarm: "#f2c07a",
-  windowCool: "#7dd3ff",
-  neonPink: "#c084fc",
-  neonCyan: "#60d8ff",
-  neonAmber: "#f3b36b",
-  neonBlue: "#38bdf8",
-  signMagenta: "#e879f9",
-  dreamyCyan: "#7ce6ff",
-  dreamyViolet: "#9b7cff",
-  dreamyRose: "#ff9edb",
 };
+
+const ramenPalette = {
+  BOWL_DARK: 0x1a1a1a,
+  BOWL_LIGHT: 0x2d2d2d,
+  RIM_ORANGE: 0xe07438,
+  BROTH_DEEP: 0x9e5b26,
+  BROTH_SURFACE: 0xcc7a36,
+  BROTH_LIGHT: 0xe89a4f,
+  NOODLE: 0xf2e8c4,
+  NOODLE_SHADOW: 0xd9cca1,
+  EGG_WHITE: 0xfdfdfd,
+  EGG_YOLK_CORE: 0xeaa223,
+  EGG_YOLK_OUTER: 0xfccf5e,
+  NORI: 0x1d1821,
+  ONION_LIGHT: 0x76c442,
+  ONION_DARK: 0x4da033,
+  CHOPSTICK_RED: 0xbf3030,
+  CHOPSTICK_DETAIL: 0xdddddd,
+  STEAM: 0xffffff,
+} as const;
+
+type RamenKey = keyof typeof ramenPalette;
+
+function createSeededRng(seed: number) {
+  let t = seed >>> 0;
+  return () => {
+    t += 0x6d2b79f5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 function FrameLimiter({ fps, active }: { fps: number; active: boolean }) {
   const { invalidate } = useThree();
@@ -81,408 +101,363 @@ function useSceneActivity() {
   return { containerRef, active: inView && isVisible && !isScrolling };
 }
 
-type FrameSegmentProps = {
-  z: number;
-  scale: number;
-  color: string;
+function InstancedVoxels({
+  geometry,
+  material,
+  matrices,
+}: {
+  geometry: THREE.BufferGeometry;
+  material: THREE.Material;
+  matrices: THREE.Matrix4[];
+}) {
+  const mesh = useRef<THREE.InstancedMesh>(null!);
+
+  useEffect(() => {
+    for (let i = 0; i < matrices.length; i += 1) {
+      mesh.current.setMatrixAt(i, matrices[i]);
+    }
+    mesh.current.instanceMatrix.needsUpdate = true;
+    mesh.current.computeBoundingSphere();
+  }, [matrices]);
+
+  return (
+    <instancedMesh
+      ref={mesh}
+      args={[geometry, material, matrices.length]}
+      frustumCulled={false}
+    />
+  );
+}
+
+type SteamParticle = {
+  baseX: number;
+  baseZ: number;
+  riseSpeed: number;
+  phase: number;
 };
 
-function FrameSegment({ z, scale, color }: FrameSegmentProps) {
-  const size = 2.4 * scale;
-  const thickness = 0.06 * scale;
-  const depth = 0.06 * scale;
+function Steam({
+  voxelSize,
+  reducedMotion,
+  pauseMotion,
+}: {
+  voxelSize: number;
+  reducedMotion?: boolean;
+  pauseMotion?: boolean;
+}) {
+  const steamGeo = useMemo(
+    () => new THREE.BoxGeometry(voxelSize * 0.92, voxelSize * 0.92, voxelSize * 0.92),
+    [voxelSize]
+  );
+  const materials = useMemo(
+    () =>
+      Array.from(
+        { length: 8 },
+        () =>
+          new THREE.MeshBasicMaterial({
+            color: ramenPalette.STEAM,
+            transparent: true,
+            opacity: 0.35,
+          })
+      ),
+    []
+  );
+  const rng = useMemo(() => createSeededRng(20251221), []);
+  const particles = useMemo<SteamParticle[]>(
+    () =>
+      Array.from({ length: 8 }, () => ({
+        baseX: (rng() - 0.5) * 6 * voxelSize,
+        baseZ: (rng() - 0.5) * 6 * voxelSize,
+        riseSpeed: 0.3 + rng() * 0.35,
+        phase: rng() * Math.PI * 2,
+      })),
+    [rng, voxelSize]
+  );
+  const refs = useRef<Array<THREE.Mesh | null>>([]);
 
-  const bars = [
-    { pos: [0, size * 0.5, z], scale: [size, thickness, depth] },
-    { pos: [0, -size * 0.5, z], scale: [size, thickness, depth] },
-    { pos: [-size * 0.5, 0, z], scale: [thickness, size, depth] },
-    { pos: [size * 0.5, 0, z], scale: [thickness, size, depth] },
-  ];
+  useEffect(() => {
+    return () => {
+      steamGeo.dispose();
+      materials.forEach((mat) => mat.dispose());
+    };
+  }, [materials, steamGeo]);
+
+  useFrame(({ clock }) => {
+    if (reducedMotion || pauseMotion) return;
+
+    const t = clock.getElapsedTime();
+    const baseY = 12 * voxelSize;
+    const rise = 10 * voxelSize;
+    const wiggle = 1.5 * voxelSize;
+
+    particles.forEach((particle, idx) => {
+      const mesh = refs.current[idx];
+      const mat = materials[idx];
+      if (!mesh || !mat) return;
+
+      const u = (t * particle.riseSpeed + particle.phase) % 1;
+      const y = baseY + u * rise;
+      mesh.position.y = y;
+      mesh.position.x =
+        particle.baseX + Math.sin(t * 2 + particle.phase) * wiggle;
+      mesh.position.z =
+        particle.baseZ + Math.cos(t * 1.5 + particle.phase) * wiggle;
+
+      mat.opacity = 0.35 * (1 - u);
+    });
+  });
 
   return (
     <group>
-      {bars.map((bar, index) => (
+      {particles.map((particle, idx) => (
         <mesh
-          key={index}
-          position={bar.pos as [number, number, number]}
-          scale={bar.scale as [number, number, number]}
-        >
-          <boxGeometry args={[1, 1, 1]} />
-          <meshStandardMaterial
-            color={color}
-            metalness={0.4}
-            roughness={0.6}
-            flatShading
-          />
-        </mesh>
+          key={idx}
+          ref={(el) => {
+            refs.current[idx] = el;
+          }}
+          geometry={steamGeo}
+          material={materials[idx]}
+          position={[particle.baseX, 12 * voxelSize, particle.baseZ]}
+        />
       ))}
     </group>
   );
 }
 
-type BuildingProps = {
-  position: [number, number, number];
-  size: [number, number, number];
-  seed: number;
-};
+function VoxelRamen({
+  reducedMotion,
+  pauseMotion,
+}: {
+  reducedMotion?: boolean;
+  pauseMotion?: boolean;
+}) {
+  const ramen = useRef<THREE.Group>(null!);
+  const voxelSize = 0.12;
+  const cube = useMemo(
+    () => new THREE.BoxGeometry(voxelSize * 0.92, voxelSize * 0.92, voxelSize * 0.92),
+    [voxelSize]
+  );
 
-function Building({ position, size, seed }: BuildingProps) {
-  const [width, height, depth] = size;
-  const rows = 6;
-  const cols = 4;
+  const materials = useMemo(() => {
+    const standard = (color: number, roughness = 0.8, metalness = 0.1) =>
+      new THREE.MeshStandardMaterial({
+        color,
+        roughness,
+        metalness,
+        flatShading: true,
+      });
 
-  const windows = useMemo(() => {
-    const cells: { x: number; y: number; warm: boolean }[] = [];
-    for (let row = 0; row < rows; row += 1) {
-      for (let col = 0; col < cols; col += 1) {
-        const gate = (row * 7 + col * 11 + seed) % 5;
-        if (gate < 3) {
-          cells.push({
-            x: (col - (cols - 1) / 2) * 0.25,
-            y: (row - (rows - 1) / 2) * 0.25,
-            warm: gate % 2 === 0,
-          });
+    return {
+      BOWL_DARK: standard(ramenPalette.BOWL_DARK, 0.9, 0.05),
+      BOWL_LIGHT: standard(ramenPalette.BOWL_LIGHT, 0.85, 0.05),
+      RIM_ORANGE: standard(ramenPalette.RIM_ORANGE, 0.75, 0.05),
+      BROTH_DEEP: standard(ramenPalette.BROTH_DEEP, 0.55, 0.02),
+      BROTH_SURFACE: standard(ramenPalette.BROTH_SURFACE, 0.45, 0.02),
+      BROTH_LIGHT: standard(ramenPalette.BROTH_LIGHT, 0.35, 0.01),
+      NOODLE: standard(ramenPalette.NOODLE, 0.85, 0.0),
+      NOODLE_SHADOW: standard(ramenPalette.NOODLE_SHADOW, 0.9, 0.0),
+      EGG_WHITE: standard(ramenPalette.EGG_WHITE, 0.75, 0.02),
+      EGG_YOLK_CORE: standard(ramenPalette.EGG_YOLK_CORE, 0.6, 0.02),
+      EGG_YOLK_OUTER: standard(ramenPalette.EGG_YOLK_OUTER, 0.65, 0.02),
+      NORI: standard(ramenPalette.NORI, 0.95, 0.0),
+      ONION_LIGHT: standard(ramenPalette.ONION_LIGHT, 0.8, 0.0),
+      ONION_DARK: standard(ramenPalette.ONION_DARK, 0.85, 0.0),
+      CHOPSTICK_RED: standard(ramenPalette.CHOPSTICK_RED, 0.75, 0.05),
+      CHOPSTICK_DETAIL: standard(ramenPalette.CHOPSTICK_DETAIL, 0.75, 0.05),
+    } satisfies Record<Exclude<RamenKey, "STEAM">, THREE.MeshStandardMaterial>;
+  }, []);
+
+  const instances = useMemo(() => {
+    const layers = Object.keys(ramenPalette).reduce(
+      (acc, key) => {
+        acc[key as RamenKey] = [];
+        return acc;
+      },
+      {} as Record<RamenKey, THREE.Matrix4[]>
+    );
+
+    const dummy = new THREE.Object3D();
+    const rng = createSeededRng(424242);
+    const add = (key: RamenKey, x: number, y: number, z: number) => {
+      dummy.position.set(x * voxelSize, y * voxelSize, z * voxelSize);
+      dummy.updateMatrix();
+      layers[key].push(dummy.matrix.clone());
+    };
+
+    const bowlRadius = 14;
+    const bowlHeight = 10;
+    const rimHeight = 11;
+
+    for (let y = 0; y <= rimHeight; y += 1) {
+      for (let x = -bowlRadius - 2; x <= bowlRadius + 2; x += 1) {
+        for (let z = -bowlRadius - 2; z <= bowlRadius + 2; z += 1) {
+          const dist = Math.hypot(x, z);
+          const currentRadius = bowlRadius * (0.6 + 0.4 * (y / bowlHeight));
+
+          if (dist <= currentRadius && dist >= currentRadius - 1.5) {
+            if (y === rimHeight) add("RIM_ORANGE", x, y, z);
+            else add(rng() > 0.8 ? "BOWL_LIGHT" : "BOWL_DARK", x, y, z);
+          } else if (y === 0 && dist < currentRadius) {
+            add("BOWL_DARK", x, y, z);
+          } else if (y > 0 && y < rimHeight - 1 && dist < currentRadius - 1.5) {
+            if (y === rimHeight - 2) {
+              let color: RamenKey = "BROTH_SURFACE";
+              if (dist > currentRadius - 3) color = "BROTH_DEEP";
+              if (rng() > 0.9) color = "BROTH_LIGHT";
+              add(color, x, y, z);
+            } else if (y >= rimHeight - 4) {
+              add("BROTH_DEEP", x, y, z);
+            }
+          }
         }
       }
     }
-    return cells;
-  }, [seed]);
 
-  return (
-    <group position={position}>
-      <mesh>
-        <boxGeometry args={[width, height, depth]} />
-        <meshStandardMaterial
-          color={palette.bridge}
-          metalness={0.2}
-          roughness={0.85}
-          flatShading
-        />
-      </mesh>
-      <mesh position={[0, height / 2 + 0.05, 0]} scale={[0.1, 0.12, 0.1]}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial
-          color={palette.neonAmber}
-          emissive={palette.neonAmber}
-          emissiveIntensity={0.6}
-          toneMapped={false}
-        />
-      </mesh>
-      {windows.map((cell, index) => (
-        <mesh
-          key={index}
-          position={[cell.x, cell.y, depth / 2 + 0.01]}
-          scale={[0.12, 0.18, 0.02]}
-        >
-          <boxGeometry args={[1, 1, 1]} />
-          <meshStandardMaterial
-            color={cell.warm ? palette.windowWarm : palette.windowCool}
-            emissive={cell.warm ? palette.windowWarm : palette.windowCool}
-            emissiveIntensity={0.75}
-            toneMapped={false}
-          />
-        </mesh>
-      ))}
-    </group>
-  );
-}
+    const surfaceY = rimHeight - 1;
 
-function NeonBillboard({
-  position,
-  pauseMotion,
-}: {
-  position: [number, number, number];
-  pauseMotion?: boolean;
-}) {
-  const panel = useRef<THREE.Mesh>(null!);
+    for (let i = 0; i < 15; i += 1) {
+      const startX = (rng() - 0.5) * 16;
+      const startZ = (rng() - 0.5) * 16;
+      const freq = 0.5 + rng();
+      const amp = 1 + rng();
 
-  useFrame(({ clock }) => {
-    if (pauseMotion) return;
-    const t = clock.getElapsedTime();
-    (panel.current.material as THREE.MeshStandardMaterial).emissiveIntensity =
-      0.5 + Math.sin(t * 1.1) * 0.15;
-  });
-
-  return (
-    <group position={position}>
-      <mesh ref={panel} scale={[1.6, 0.5, 0.08]}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial
-          color={palette.signMagenta}
-          emissive={palette.signMagenta}
-          emissiveIntensity={0.6}
-          toneMapped={false}
-          flatShading
-        />
-      </mesh>
-      {[...Array(6)].map((_, i) => (
-        <mesh
-          key={i}
-          position={[-0.6 + i * 0.24, 0.05, 0.06]}
-          scale={[0.12, 0.18, 0.04]}
-        >
-          <boxGeometry args={[1, 1, 1]} />
-          <meshStandardMaterial
-            color={i % 2 === 0 ? palette.neonCyan : palette.neonAmber}
-            emissive={i % 2 === 0 ? palette.neonCyan : palette.neonAmber}
-            emissiveIntensity={0.7}
-            toneMapped={false}
-            flatShading
-          />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-function NeonOrb({
-  reducedMotion,
-  pauseMotion,
-}: {
-  reducedMotion?: boolean;
-  pauseMotion?: boolean;
-}) {
-  const orb = useRef<THREE.Mesh>(null!);
-  const ring = useRef<THREE.Mesh>(null!);
-  const aura = useRef<THREE.Mesh>(null!);
-  const core = useRef<THREE.Mesh>(null!);
-
-  useFrame(({ clock }) => {
-    if (reducedMotion || pauseMotion) return;
-    const t = clock.getElapsedTime();
-    orb.current.rotation.y = t * 0.25;
-    ring.current.rotation.z = t * 0.35;
-    aura.current.scale.setScalar(1 + Math.sin(t * 0.6) * 0.03);
-
-    const hue = (t * 0.12) % 1;
-    const coreMaterial = core.current.material as THREE.MeshStandardMaterial;
-    coreMaterial.color.setHSL(hue, 0.9, 0.6);
-    coreMaterial.emissive.setHSL((hue + 0.08) % 1, 0.9, 0.55);
-    coreMaterial.emissiveIntensity = 0.85 + Math.sin(t * 1.6) * 0.2;
-    core.current.scale.setScalar(0.52 + Math.sin(t * 1.3) * 0.05);
-  });
-
-  return (
-    <group position={[0.2, -0.1, -0.4]}>
-      <mesh ref={orb}>
-        <icosahedronGeometry args={[0.6, 0]} />
-        <meshStandardMaterial
-          color={palette.dreamyCyan}
-          emissive={palette.dreamyCyan}
-          emissiveIntensity={0.18}
-          metalness={0.15}
-          roughness={0.15}
-          transparent
-          opacity={0.38}
-          depthWrite={false}
-          flatShading
-          toneMapped={false}
-        />
-      </mesh>
-      <mesh ref={core}>
-        <icosahedronGeometry args={[0.32, 0]} />
-        <meshStandardMaterial
-          color={palette.neonBlue}
-          emissive={palette.neonBlue}
-          emissiveIntensity={0.9}
-          metalness={0.1}
-          roughness={0.2}
-          transparent
-          opacity={0.9}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          toneMapped={false}
-        />
-      </mesh>
-      <mesh ref={aura}>
-        <sphereGeometry args={[0.8, 10, 10]} />
-        <meshBasicMaterial
-          color={palette.dreamyCyan}
-          transparent
-          opacity={0.18}
-          blending={THREE.AdditiveBlending}
-        />
-      </mesh>
-      <mesh ref={ring} position={[0, 0.1, 0]}>
-        <torusGeometry args={[0.9, 0.05, 8, 32]} />
-        <meshStandardMaterial
-          color={palette.neonPink}
-          emissive={palette.neonPink}
-          emissiveIntensity={0.35}
-          metalness={0.2}
-          roughness={0.4}
-          flatShading
-          toneMapped={false}
-        />
-      </mesh>
-    </group>
-  );
-}
-
-function StardustField({
-  reducedMotion,
-  pauseMotion,
-}: {
-  reducedMotion?: boolean;
-  pauseMotion?: boolean;
-}) {
-  const points = useRef<THREE.Points>(null!);
-  const shimmer = useRef<THREE.Mesh>(null!);
-
-  const { positions, colors } = useMemo(() => {
-    const count = 420;
-    const positionArray = new Float32Array(count * 3);
-    const colorArray = new Float32Array(count * 3);
-    const color = new THREE.Color();
-
-    for (let i = 0; i < count; i += 1) {
-      const x = THREE.MathUtils.randFloat(-1.8, 1.8);
-      const y = THREE.MathUtils.randFloat(-0.15, 0.15);
-      const z = THREE.MathUtils.randFloat(-0.6, 0.6);
-
-      positionArray.set([x, y, z], i * 3);
-
-      const hue = (i / count) * 0.8 + 0.1;
-      color.setHSL(hue, 0.75, 0.65);
-      colorArray.set([color.r, color.g, color.b], i * 3);
+      for (let t = 0; t < 10; t += 0.5) {
+        const nx = Math.floor(startX + t);
+        const nz = Math.floor(startZ + Math.sin(t * freq) * amp);
+        if (Math.hypot(nx, nz) < bowlRadius - 2) {
+          add("NOODLE", nx, surfaceY, nz);
+        }
+      }
     }
 
-    return { positions: positionArray, colors: colorArray };
-  }, []);
+    const eggX = -5;
+    const eggZ = -4;
+    for (let x = -3; x <= 3; x += 1) {
+      for (let z = -3; z <= 3; z += 1) {
+        const d = Math.hypot(x, z);
+        if (d < 3) {
+          add("EGG_WHITE", eggX + x, surfaceY, eggZ + z);
+          if (d < 1.5) {
+            add(
+              d < 0.8 ? "EGG_YOLK_CORE" : "EGG_YOLK_OUTER",
+              eggX + x,
+              surfaceY + 1,
+              eggZ + z
+            );
+          } else {
+            add("EGG_WHITE", eggX + x, surfaceY + 1, eggZ + z);
+          }
+        }
+      }
+    }
+
+    for (let u = 0; u < 6; u += 1) {
+      for (let v = 0; v < 7; v += 1) {
+        const nx = 4 + u;
+        const nz = 4 + v;
+        const ny = surfaceY + 1 + u * 0.5;
+        add("NORI", nx, Math.floor(ny), nz);
+      }
+    }
+
+    for (let i = 0; i < 12; i += 1) {
+      const ox = (rng() - 0.5) * 8;
+      const oz = (rng() - 0.5) * 8;
+      if (Math.hypot(ox, oz) < 10) {
+        add("ONION_LIGHT", Math.floor(ox), surfaceY + 1, Math.floor(oz));
+        add("ONION_DARK", Math.floor(ox) + 1, surfaceY + 1, Math.floor(oz));
+      }
+    }
+
+    const csStart = { x: 18, y: 16, z: 8 };
+    const csEnd = { x: -8, y: 12, z: -8 };
+
+    const drawLine = (offsetZ: number) => {
+      const dx = csEnd.x - csStart.x;
+      const dy = csEnd.y - csStart.y;
+      const dz = csEnd.z - csStart.z;
+      const steps = Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz)) * 1.5;
+
+      for (let i = 0; i <= steps; i += 1) {
+        const t = i / steps;
+        const x = Math.floor(csStart.x + dx * t);
+        const y = Math.floor(csStart.y + dy * t);
+        const z = Math.floor(csStart.z + dz * t) + offsetZ;
+
+        let col: RamenKey = "CHOPSTICK_RED";
+        if (i < 5 || (i > 7 && i < 10)) col = "CHOPSTICK_DETAIL";
+
+        add(col, x, y, z);
+      }
+    };
+
+    drawLine(0);
+    drawLine(3);
+
+    return layers;
+  }, [voxelSize]);
+
+  useEffect(() => {
+    return () => {
+      cube.dispose();
+      Object.values(materials).forEach((material) => material.dispose());
+    };
+  }, [cube, materials]);
 
   useFrame(({ clock }) => {
     if (reducedMotion || pauseMotion) return;
     const t = clock.getElapsedTime();
-    points.current.rotation.y = Math.sin(t * 0.15) * 0.08;
-    points.current.rotation.x = Math.cos(t * 0.2) * 0.04;
-    shimmer.current.scale.setScalar(1 + Math.sin(t * 0.6) * 0.02);
-    (shimmer.current.material as THREE.MeshBasicMaterial).opacity =
-      0.14 + Math.sin(t * 0.8) * 0.03;
+    ramen.current.rotation.y = t * 0.2;
+    ramen.current.rotation.x = Math.PI / 12 + Math.sin(t * 0.3) * 0.03;
+    ramen.current.rotation.z = Math.PI / 24;
+    ramen.current.position.y = -0.8 + Math.sin(t * 0.8) * 0.08;
   });
 
+  const voxelLayers = useMemo(
+    () =>
+      (Object.keys(materials) as Array<Exclude<RamenKey, "STEAM">>).filter(
+        (key) => instances[key]?.length
+      ),
+    [instances, materials]
+  );
+
   return (
-    <group position={[0, -0.55, -0.35]}>
-      <mesh ref={shimmer} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[2.3, 48]} />
-        <meshBasicMaterial
-          color={palette.dreamyViolet}
-          transparent
-          opacity={0.16}
-          blending={THREE.AdditiveBlending}
+    <group ref={ramen} position={[0, -0.7, 0]}>
+      {voxelLayers.map((key) => (
+        <InstancedVoxels
+          key={key}
+          geometry={cube}
+          material={materials[key]}
+          matrices={instances[key]}
         />
-      </mesh>
-      <points ref={points}>
-        <bufferGeometry>
-          <bufferAttribute attach="attributes-position" args={[positions, 3]} />
-          <bufferAttribute attach="attributes-color" args={[colors, 3]} />
-        </bufferGeometry>
-        <pointsMaterial
-          size={0.03}
-          vertexColors
-          transparent
-          opacity={0.85}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </points>
+      ))}
+      <Steam
+        voxelSize={voxelSize}
+        reducedMotion={reducedMotion}
+        pauseMotion={pauseMotion}
+      />
     </group>
   );
 }
 
-function PixelPeople() {
-  return (
-    <group position={[0, -0.85, 0.4]}>
-      <mesh position={[-0.3, 0, 0]} scale={[0.18, 0.42, 0.18]}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial color="#0c0f15" flatShading />
-      </mesh>
-      <mesh position={[0.2, 0.02, 0]} scale={[0.16, 0.38, 0.16]}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial color="#151a24" flatShading />
-      </mesh>
-    </group>
-  );
-}
-
-function LightRig({
-  reducedMotion,
-  pauseMotion,
-}: {
-  reducedMotion?: boolean;
-  pauseMotion?: boolean;
-}) {
-  const key = useRef<THREE.PointLight>(null!);
-  const rim = useRef<THREE.PointLight>(null!);
-  const glow = useRef<THREE.PointLight>(null!);
-
-  useFrame(({ clock }) => {
-    if (reducedMotion || pauseMotion) return;
-    const t = clock.getElapsedTime();
-    key.current.position.set(2.2 * Math.sin(t * 0.25), 1.4, 2.4);
-    rim.current.position.set(-2.1, -0.3 + Math.cos(t * 0.35) * 0.25, 2.2);
-    glow.current.intensity = 0.5 + Math.sin(t * 0.7) * 0.12;
-  });
-
+function LightRig() {
   return (
     <>
-      <ambientLight intensity={0.35} />
-      <pointLight ref={key} intensity={0.8} color="#f6d7c0" />
-      <pointLight ref={rim} intensity={0.55} color="#7dd3ff" />
-      <pointLight
-        ref={glow}
-        position={[0, 1.4, -1.4]}
-        intensity={0.5}
-        color={palette.dreamyRose}
-      />
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[4.5, 6.5, 4.5]} intensity={0.85} />
+      <directionalLight position={[-4, 2, -3]} intensity={0.35} color="#f5b8a1" />
     </>
   );
 }
 
-function SceneRoot({
-  reducedMotion,
-  pauseMotion,
-}: HeroSceneProps & { pauseMotion?: boolean }) {
-  const frames = useMemo(
-    () =>
-      Array.from({ length: 7 }, (_, i) => ({
-        z: -0.4 - i * 0.65,
-        scale: 1 + i * 0.14,
-      })),
-    []
-  );
-  const scene = useRef<THREE.Group>(null!);
+function CameraRig() {
+  const { camera } = useThree();
 
-  useFrame(({ clock }) => {
-    if (reducedMotion || pauseMotion) return;
-    const t = clock.getElapsedTime();
-    scene.current.rotation.y = t * 0.08;
-    scene.current.rotation.x = Math.sin(t * 0.2) * 0.02;
-  });
+  useEffect(() => {
+    camera.lookAt(0, 0, 0);
+  }, [camera]);
 
-  return (
-    <group ref={scene}>
-      {frames.map((frame) => (
-        <FrameSegment
-          key={frame.z}
-          z={frame.z}
-          scale={frame.scale}
-          color={palette.frame}
-        />
-      ))}
-
-      <StardustField reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
-
-      <Building position={[-1.9, 0.25, -2.7]} size={[1, 2.6, 0.9]} seed={4} />
-      <Building position={[1.8, 0.3, -2.5]} size={[1, 2.3, 0.9]} seed={9} />
-      <Building position={[0, 0.1, -3.2]} size={[0.8, 1.8, 0.7]} seed={13} />
-
-      <NeonBillboard position={[-1.3, 1.1, -1.8]} pauseMotion={pauseMotion} />
-      <NeonBillboard position={[1.4, 0.9, -1.4]} pauseMotion={pauseMotion} />
-
-      <NeonOrb reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
-      <PixelPeople />
-    </group>
-  );
+  return null;
 }
 
 export default function HeroScene({ reducedMotion }: HeroSceneProps) {
@@ -492,16 +467,21 @@ export default function HeroScene({ reducedMotion }: HeroSceneProps) {
   return (
     <div ref={containerRef} className="h-full w-full">
       <Canvas
-        camera={{ position: [0, 0.35, 5.6], fov: 36 }}
+        orthographic
+        camera={{ position: [3.8, 3.8, 3.8], zoom: 90, near: 0.1, far: 100 }}
         dpr={[1, 1.2]}
         gl={{ alpha: true, antialias: false, powerPreference: "low-power" }}
         frameloop="demand"
+        onCreated={({ gl }) => {
+          gl.toneMapping = THREE.ACESFilmicToneMapping;
+          gl.toneMappingExposure = 1.2;
+        }}
       >
         <color attach="background" args={[palette.sky]} />
-        <fog attach="fog" args={[palette.sky, 5.5, 10.5]} />
         <FrameLimiter fps={reducedMotion ? 12 : 24} active={active} />
-        <LightRig reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
-        <SceneRoot reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
+        <CameraRig />
+        <LightRig />
+        <VoxelRamen reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
       </Canvas>
     </div>
   );

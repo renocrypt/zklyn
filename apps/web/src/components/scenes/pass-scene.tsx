@@ -315,7 +315,7 @@ function VoxelCassette({ reducedMotion, pauseMotion }: VoxelCassetteProps) {
   });
 
   return (
-    <group ref={tape} position={[0.0, -0.1, -0.2]} rotation={[Math.PI / 12, 0, Math.PI / 24]} scale={0.35}>
+    <group ref={tape} position={[0.0, -0.1, -0.2]} rotation={[Math.PI / 12, 0, Math.PI / 24]} scale={0.5}>
       <instancedMesh ref={plasticRef} args={[geometry, materials.plastic, matrices.plastic.length]} frustumCulled={false} />
       <instancedMesh ref={labelRef} args={[geometry, materials.label, matrices.label.length]} frustumCulled={false} />
       <instancedMesh ref={darkRef} args={[geometry, materials.dark, matrices.dark.length]} frustumCulled={false} />
