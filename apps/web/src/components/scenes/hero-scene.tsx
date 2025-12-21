@@ -123,10 +123,12 @@ function IridescentBackdrop({
 
   const geometry = useMemo(() => new THREE.PlaneGeometry(200, 160, 1, 1), []);
   const material = useMemo(() => {
-    const base = new THREE.Color("#050505");
+    const base = new THREE.Color("#03030b");
     const c1 = new THREE.Color("#60d8ff");
     const c2 = new THREE.Color("#c084fc");
     const c3 = new THREE.Color("#ff9edb");
+    const c4 = new THREE.Color("#4ade80");
+    const c5 = new THREE.Color("#fbbf24");
 
     return new THREE.ShaderMaterial({
       depthWrite: false,
@@ -136,6 +138,8 @@ function IridescentBackdrop({
         uC1: { value: c1 },
         uC2: { value: c2 },
         uC3: { value: c3 },
+        uC4: { value: c4 },
+        uC5: { value: c5 },
       },
       vertexShader: `
         varying vec2 vUv;
@@ -152,29 +156,64 @@ function IridescentBackdrop({
         uniform vec3 uC1;
         uniform vec3 uC2;
         uniform vec3 uC3;
+        uniform vec3 uC4;
+        uniform vec3 uC5;
 
-        float softRing(float r, float center, float width) {
-          float d = abs(r - center);
+        float softRing(vec2 p, vec2 center, float radius, float width) {
+          float d = abs(length(p - center) - radius);
           return smoothstep(width, 0.0, d);
+        }
+
+        float softBlob(vec2 p, vec2 center, float radius) {
+          float d = length(p - center);
+          float k = max(radius, 0.001);
+          return exp(- (d * d) / (k * k));
         }
 
         void main() {
           vec2 p = vUv * 2.0 - 1.0;
           p.x *= 1.15;
-          float r = length(p);
+          float t = uTime;
 
-          float drift = 0.5 + 0.5 * sin(uTime * 0.12 + p.x * 0.7 - p.y * 0.35);
-          vec3 accent = mix(uC1, uC2, drift);
-          accent = mix(accent, uC3, 0.5 + 0.5 * sin(uTime * 0.08 + r * 1.6));
+          // "Stochastic" drift via layered sinusoids (deterministic, no true randomness).
+          vec2 c0 = vec2(sin(t * 0.17 + 0.2), cos(t * 0.13 + 1.1)) * 0.48 + vec2(0.12, -0.10);
+          vec2 c1 = vec2(sin(t * 0.11 + 1.7), cos(t * 0.19 + 0.8)) * 0.58 + vec2(-0.22, 0.14);
+          vec2 c2 = vec2(sin(t * 0.21 + 2.4), cos(t * 0.15 + 2.1)) * 0.52 + vec2(0.24, 0.22);
+          vec2 c3 = vec2(sin(t * 0.14 + 0.4), cos(t * 0.22 + 1.3)) * 0.64 + vec2(-0.14, -0.26);
+          vec2 c4 = vec2(sin(t * 0.09 + 3.0), cos(t * 0.12 + 2.8)) * 0.72 + vec2(0.02, -0.02);
 
-          float corePulse = exp(-r * 2.3) * (0.55 + 0.45 * sin(uTime * 0.75 - r * 7.5));
-          float ring1 = softRing(r, 0.38 + 0.03 * sin(uTime * 0.35), 0.08);
-          float ring2 = softRing(r, 0.74 + 0.05 * sin(uTime * 0.28 + 1.7), 0.11);
-          float glow = clamp(corePulse * 0.5 + ring1 * 0.22 + ring2 * 0.14, 0.0, 1.0);
+          c0 += vec2(sin(t * 0.73 + 4.1), cos(t * 0.81 + 1.3)) * 0.05;
+          c1 += vec2(sin(t * 0.69 + 2.7), cos(t * 0.77 + 0.9)) * 0.05;
+          c2 += vec2(sin(t * 0.62 + 5.3), cos(t * 0.71 + 4.7)) * 0.05;
+          c3 += vec2(sin(t * 0.58 + 3.9), cos(t * 0.66 + 2.2)) * 0.05;
+          c4 += vec2(sin(t * 0.55 + 1.1), cos(t * 0.63 + 5.0)) * 0.05;
 
-          float vignette = smoothstep(0.55, 1.15, r);
-          vec3 col = uBase + accent * glow;
-          col *= 1.0 - vignette * 0.65;
+          vec3 glow = vec3(0.0);
+
+          float b0 = softBlob(p, c0, 0.55);
+          float r0 = softRing(p, c0, 0.26 + 0.05 * sin(t * 0.35 + 0.6), 0.10);
+          glow += uC1 * (b0 * 0.10 + r0 * 0.08);
+
+          float b1 = softBlob(p, c1, 0.60);
+          float r1 = softRing(p, c1, 0.32 + 0.06 * sin(t * 0.29 + 1.7), 0.11);
+          glow += uC2 * (b1 * 0.09 + r1 * 0.08);
+
+          float b2 = softBlob(p, c2, 0.58);
+          float r2 = softRing(p, c2, 0.28 + 0.05 * sin(t * 0.33 + 2.9), 0.10);
+          glow += uC3 * (b2 * 0.09 + r2 * 0.07);
+
+          float b3 = softBlob(p, c3, 0.62);
+          float r3 = softRing(p, c3, 0.36 + 0.06 * sin(t * 0.27 + 0.2), 0.12);
+          glow += uC4 * (b3 * 0.08 + r3 * 0.07);
+
+          float b4 = softBlob(p, c4, 0.70);
+          float r4 = softRing(p, c4, 0.44 + 0.07 * sin(t * 0.24 + 2.1), 0.14);
+          glow += uC5 * (b4 * 0.07 + r4 * 0.06);
+
+          // Dim overall intensity and keep a dark base.
+          float vignette = smoothstep(0.6, 1.2, length(p));
+          vec3 col = uBase + glow;
+          col *= 1.0 - vignette * 0.62;
 
           gl_FragColor = vec4(col, 1.0);
         }
