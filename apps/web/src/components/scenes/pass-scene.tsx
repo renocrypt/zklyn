@@ -1,8 +1,12 @@
 "use client";
 
 import { Canvas } from "@react-three/fiber";
-import * as THREE from "three";
 
+import {
+  applyAcesToneMapping,
+  applyReinhardToneMapping,
+  CARD_CANVAS_PRESET,
+} from "./lib/canvas-presets";
 import { FrameLimiter } from "./lib/frame-limiter";
 import { useSceneActivity } from "./lib/use-scene-activity";
 import { FreeCassetteScene } from "./pass/free-cassette";
@@ -38,25 +42,28 @@ export default function PassScene({ variant, reducedMotion }: PassSceneProps) {
       <Canvas
         orthographic={variant === "premium"}
         camera={camera}
-        dpr={[1, 1.2]}
-        gl={{ alpha: true, antialias: false, powerPreference: "low-power" }}
-        frameloop="demand"
+        dpr={CARD_CANVAS_PRESET.dpr}
+        gl={CARD_CANVAS_PRESET.gl}
+        frameloop={CARD_CANVAS_PRESET.frameloop}
         onCreated={({ gl }) => {
           if (variant === "premium") {
-            gl.toneMapping = THREE.ReinhardToneMapping;
-            gl.toneMappingExposure = 1.0;
+            applyReinhardToneMapping(gl, 1.0);
           } else {
-            gl.toneMapping = THREE.ACESFilmicToneMapping;
-            gl.toneMappingExposure = 1.15;
+            applyAcesToneMapping(gl, 1.15);
           }
         }}
       >
         <color attach="background" args={[palette.sky]} />
         {variant === "free" && <fog attach="fog" args={[palette.sky, 4.5, 9]} />}
-        <FrameLimiter fps={reducedMotion ? 12 : 24} active={active} />
-        {variant === "premium"
-          ? <PremiumBonsaiScene reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
-          : <FreeCassetteScene neon={palette.neon} reducedMotion={reducedMotion} pauseMotion={pauseMotion} />}
+        <FrameLimiter
+          fps={reducedMotion ? CARD_CANVAS_PRESET.fps.reduced : CARD_CANVAS_PRESET.fps.normal}
+          active={active}
+        />
+        {variant === "premium" ? (
+          <PremiumBonsaiScene reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
+        ) : (
+          <FreeCassetteScene neon={palette.neon} reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
+        )}
       </Canvas>
     </div>
   );

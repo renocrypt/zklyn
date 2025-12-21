@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { IridescentBackdrop } from "./hero/iridescent-backdrop";
 import { HeroLightRig } from "./hero/light-rig";
 import { VoxelRamen } from "./hero/voxel-ramen";
+import { applyAcesToneMapping, HERO_CANVAS_PRESET } from "./lib/canvas-presets";
 import { FrameLimiter } from "./lib/frame-limiter";
 import { useSceneActivity } from "./lib/use-scene-activity";
 
@@ -36,12 +37,11 @@ export default function HeroScene({ reducedMotion }: HeroSceneProps) {
       <Canvas
         key={canvasKey}
         camera={HERO_CAMERA}
-        dpr={[1, 1.2]}
-        gl={{ alpha: true, antialias: false, powerPreference: "low-power" }}
-        frameloop="demand"
+        dpr={HERO_CANVAS_PRESET.dpr}
+        gl={HERO_CANVAS_PRESET.gl}
+        frameloop={HERO_CANVAS_PRESET.frameloop}
         onCreated={({ gl, camera }) => {
-          gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 1.3;
+          applyAcesToneMapping(gl, 1.3);
 
           camera.position.set(
             HERO_CAMERA.position[0],
@@ -65,7 +65,10 @@ export default function HeroScene({ reducedMotion }: HeroSceneProps) {
         }}
       >
         <color attach="background" args={[palette.sky]} />
-        <FrameLimiter fps={reducedMotion ? 12 : 24} active={active} />
+        <FrameLimiter
+          fps={reducedMotion ? HERO_CANVAS_PRESET.fps.reduced : HERO_CANVAS_PRESET.fps.normal}
+          active={active}
+        />
         <IridescentBackdrop reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
         <HeroLightRig reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
         <VoxelRamen reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
@@ -73,4 +76,3 @@ export default function HeroScene({ reducedMotion }: HeroSceneProps) {
     </div>
   );
 }
-
