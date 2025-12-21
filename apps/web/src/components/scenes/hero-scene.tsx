@@ -42,6 +42,8 @@ const HERO_CAMERA = {
   far: 1000,
 };
 
+const HERO_CAMERA_TARGET = [0, 0, 0] as [number, number, number];
+
 function createSeededRng(seed: number) {
   let t = seed >>> 0;
   return () => {
@@ -609,7 +611,7 @@ function LightRig({
 export default function HeroScene({ reducedMotion }: HeroSceneProps) {
   const { containerRef, active } = useSceneActivity();
   const pauseMotion = reducedMotion || !active;
-  const canvasKey = `${HERO_CAMERA.position.join(",")}-${HERO_CAMERA.fov}-${HERO_CAMERA.near}-${HERO_CAMERA.far}`;
+  const canvasKey = `${HERO_CAMERA.position.join(",")}-${HERO_CAMERA.fov}-${HERO_CAMERA.near}-${HERO_CAMERA.far}-${HERO_CAMERA_TARGET.join(",")}`;
 
   return (
     <div ref={containerRef} className="h-full w-full">
@@ -637,7 +639,11 @@ export default function HeroScene({ reducedMotion }: HeroSceneProps) {
             perspective.updateProjectionMatrix();
           }
 
-          camera.lookAt(0, 0, 0);
+          camera.lookAt(
+            HERO_CAMERA_TARGET[0],
+            HERO_CAMERA_TARGET[1],
+            HERO_CAMERA_TARGET[2]
+          );
         }}
       >
         <color attach="background" args={[palette.sky]} />
