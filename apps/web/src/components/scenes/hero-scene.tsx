@@ -109,6 +109,110 @@ type Voxel = {
   color: number;
 };
 
+function IridescentBackdrop({
+  reducedMotion,
+  pauseMotion,
+}: {
+  reducedMotion?: boolean;
+  pauseMotion?: boolean;
+}) {
+  const mesh = useRef<THREE.Mesh>(null!);
+  const { camera } = useThree();
+  const direction = useMemo(() => new THREE.Vector3(), []);
+  const materialRef = useRef<THREE.ShaderMaterial | null>(null);
+
+  const geometry = useMemo(() => new THREE.PlaneGeometry(200, 160, 1, 1), []);
+  const material = useMemo(() => {
+    const base = new THREE.Color("#050505");
+    const c1 = new THREE.Color("#60d8ff");
+    const c2 = new THREE.Color("#c084fc");
+    const c3 = new THREE.Color("#ff9edb");
+
+    return new THREE.ShaderMaterial({
+      depthWrite: false,
+      uniforms: {
+        uTime: { value: 0 },
+        uBase: { value: base },
+        uC1: { value: c1 },
+        uC2: { value: c2 },
+        uC3: { value: c3 },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        precision highp float;
+        varying vec2 vUv;
+        uniform float uTime;
+        uniform vec3 uBase;
+        uniform vec3 uC1;
+        uniform vec3 uC2;
+        uniform vec3 uC3;
+
+        float softRing(float r, float center, float width) {
+          float d = abs(r - center);
+          return smoothstep(width, 0.0, d);
+        }
+
+        void main() {
+          vec2 p = vUv * 2.0 - 1.0;
+          p.x *= 1.15;
+          float r = length(p);
+
+          float drift = 0.5 + 0.5 * sin(uTime * 0.12 + p.x * 0.7 - p.y * 0.35);
+          vec3 accent = mix(uC1, uC2, drift);
+          accent = mix(accent, uC3, 0.5 + 0.5 * sin(uTime * 0.08 + r * 1.6));
+
+          float corePulse = exp(-r * 2.3) * (0.55 + 0.45 * sin(uTime * 0.75 - r * 7.5));
+          float ring1 = softRing(r, 0.38 + 0.03 * sin(uTime * 0.35), 0.08);
+          float ring2 = softRing(r, 0.74 + 0.05 * sin(uTime * 0.28 + 1.7), 0.11);
+          float glow = clamp(corePulse * 0.5 + ring1 * 0.22 + ring2 * 0.14, 0.0, 1.0);
+
+          float vignette = smoothstep(0.55, 1.15, r);
+          vec3 col = uBase + accent * glow;
+          col *= 1.0 - vignette * 0.65;
+
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `,
+    });
+  }, []);
+
+  useEffect(() => {
+    materialRef.current = material;
+    return () => {
+      geometry.dispose();
+      material.dispose();
+    };
+  }, [geometry, material]);
+
+  useFrame(({ clock }) => {
+    if (!mesh.current) return;
+    camera.getWorldDirection(direction);
+    mesh.current.position.copy(camera.position).addScaledVector(direction, 90);
+    mesh.current.quaternion.copy(camera.quaternion);
+
+    if (reducedMotion || pauseMotion) return;
+    const currentMaterial = materialRef.current;
+    if (!currentMaterial) return;
+    currentMaterial.uniforms.uTime.value = clock.getElapsedTime();
+  });
+
+  return (
+    <mesh
+      ref={mesh}
+      geometry={geometry}
+      material={material}
+      frustumCulled={false}
+      renderOrder={-10}
+    />
+  );
+}
+
 function IridescentDust({
   reducedMotion,
   pauseMotion,
@@ -446,7 +550,8 @@ function LightRig({
 
   return (
     <>
-      <ambientLight intensity={0.55} />
+      <ambientLight intensity={0.65} />
+      <hemisphereLight args={["#9ad5ff", "#1a0c23", 0.22]} />
       <directionalLight position={[20, 40, 20]} intensity={1.05} color="#fff2e8" />
       <directionalLight position={[-18, 16, -12]} intensity={0.3} color="#9ad5ff" />
       <pointLight ref={iridescent} distance={120} intensity={0.95} />
@@ -478,13 +583,13 @@ export default function HeroScene({ reducedMotion }: HeroSceneProps) {
         frameloop="demand"
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 1.2;
+          gl.toneMappingExposure = 1.3;
         }}
       >
         <color attach="background" args={[palette.sky]} />
-        <fog attach="fog" args={[palette.sky, 40, 90]} />
         <FrameLimiter fps={reducedMotion ? 12 : 24} active={active} />
         <CameraRig />
+        <IridescentBackdrop reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
         <LightRig reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
         <VoxelRamen reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
       </Canvas>
