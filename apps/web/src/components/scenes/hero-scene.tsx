@@ -438,40 +438,6 @@ function LightRig({
   );
 }
 
-function DreamyBackdrop() {
-  return (
-    <group position={[0, 0.2, -1.8]}>
-      <mesh>
-        <planeGeometry args={[6, 4]} />
-        <meshBasicMaterial
-          color={palette.dreamyCyan}
-          transparent
-          opacity={0.12}
-          blending={THREE.AdditiveBlending}
-        />
-      </mesh>
-      <mesh position={[0.4, 0.2, 0.1]}>
-        <planeGeometry args={[5.5, 3.6]} />
-        <meshBasicMaterial
-          color={palette.dreamyViolet}
-          transparent
-          opacity={0.12}
-          blending={THREE.AdditiveBlending}
-        />
-      </mesh>
-      <mesh position={[-0.2, -0.2, 0.15]}>
-        <planeGeometry args={[5.2, 3.2]} />
-        <meshBasicMaterial
-          color={palette.dreamyRose}
-          transparent
-          opacity={0.08}
-          blending={THREE.AdditiveBlending}
-        />
-      </mesh>
-    </group>
-  );
-}
-
 function SceneRoot({
   reducedMotion,
   pauseMotion,
@@ -504,8 +470,6 @@ function SceneRoot({
           flatShading
         />
       </mesh>
-
-      <DreamyBackdrop />
 
       {frames.map((frame) => (
         <FrameSegment

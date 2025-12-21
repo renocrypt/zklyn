@@ -479,31 +479,6 @@ function LightRig({
   );
 }
 
-function DreamyBackdrop({ colorA, colorB }: { colorA: string; colorB: string }) {
-  return (
-    <group position={[0, 0.2, -1.4]}>
-      <mesh>
-        <planeGeometry args={[4.8, 3.2]} />
-        <meshBasicMaterial
-          color={colorA}
-          transparent
-          opacity={0.12}
-          blending={THREE.AdditiveBlending}
-        />
-      </mesh>
-      <mesh position={[0.3, 0.1, 0.1]}>
-        <planeGeometry args={[4.2, 2.8]} />
-        <meshBasicMaterial
-          color={colorB}
-          transparent
-          opacity={0.1}
-          blending={THREE.AdditiveBlending}
-        />
-      </mesh>
-    </group>
-  );
-}
-
 function SceneRoot({
   variant,
   reducedMotion,
@@ -525,8 +500,6 @@ function SceneRoot({
         <planeGeometry args={[6, 4]} />
         <meshStandardMaterial color="#151a24" metalness={0.2} roughness={0.85} flatShading />
       </mesh>
-
-      <DreamyBackdrop colorA={palette.dreamyA} colorB={palette.dreamyB} />
 
       <mesh position={[0, 0.6, -1.4]} scale={[2.4, 1.3, 0.05]}>
         <boxGeometry args={[1, 1, 1]} />
