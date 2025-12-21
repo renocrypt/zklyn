@@ -417,10 +417,14 @@ function NeonVoxelBonsai({
         roughness: 0.2,
         metalness: 0.1,
         flatShading: true,
-        vertexColors: true,
       }),
     []
   );
+  const instanceColor = useMemo(() => {
+    const colors = new Float32Array(voxels.length * 3);
+    colors.fill(1);
+    return new THREE.InstancedBufferAttribute(colors, 3);
+  }, [voxels.length]);
 
   useEffect(() => {
     return () => {
@@ -475,7 +479,12 @@ function NeonVoxelBonsai({
 
   return (
     <group ref={bonsai} position={[-center.x, -center.y, -center.z]} scale={0.95}>
-      <instancedMesh ref={instanced} args={[geometry, material, voxels.length]} frustumCulled={false} />
+      <instancedMesh
+        ref={instanced}
+        args={[geometry, material, voxels.length]}
+        instanceColor={instanceColor}
+        frustumCulled={false}
+      />
     </group>
   );
 }
