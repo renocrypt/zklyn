@@ -30,7 +30,7 @@ const palettes = {
 
 export default function PassScene({ variant, reducedMotion }: PassSceneProps) {
   const palette = palettes[variant];
-  const { containerRef, active } = useSceneActivity();
+  const { containerRef, inView, active } = useSceneActivity({ initialInView: false });
   const pauseMotion = reducedMotion || !active;
   const camera =
     variant === "free"
@@ -39,32 +39,43 @@ export default function PassScene({ variant, reducedMotion }: PassSceneProps) {
 
   return (
     <div ref={containerRef} className="h-full w-full">
-      <Canvas
-        orthographic={variant === "premium"}
-        camera={camera}
-        dpr={CARD_CANVAS_PRESET.dpr}
-        gl={CARD_CANVAS_PRESET.gl}
-        frameloop={CARD_CANVAS_PRESET.frameloop}
-        onCreated={({ gl }) => {
-          if (variant === "premium") {
-            applyReinhardToneMapping(gl, 1.0);
-          } else {
-            applyAcesToneMapping(gl, 1.15);
-          }
-        }}
-      >
-        <color attach="background" args={[palette.sky]} />
-        {variant === "free" && <fog attach="fog" args={[palette.sky, 4.5, 9]} />}
-        <FrameLimiter
-          fps={reducedMotion ? CARD_CANVAS_PRESET.fps.reduced : CARD_CANVAS_PRESET.fps.normal}
-          active={active}
+      {inView ? (
+        <Canvas
+          orthographic={variant === "premium"}
+          camera={camera}
+          dpr={CARD_CANVAS_PRESET.dpr}
+          gl={CARD_CANVAS_PRESET.gl}
+          frameloop={CARD_CANVAS_PRESET.frameloop}
+          onCreated={({ gl }) => {
+            if (variant === "premium") {
+              applyReinhardToneMapping(gl, 1.0);
+            } else {
+              applyAcesToneMapping(gl, 1.15);
+            }
+          }}
+        >
+          <color attach="background" args={[palette.sky]} />
+          {variant === "free" && <fog attach="fog" args={[palette.sky, 4.5, 9]} />}
+          <FrameLimiter
+            fps={reducedMotion ? CARD_CANVAS_PRESET.fps.reduced : CARD_CANVAS_PRESET.fps.normal}
+            active={active}
+          />
+          {variant === "premium" ? (
+            <PremiumBonsaiScene reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
+          ) : (
+            <FreeCassetteScene
+              neon={palette.neon}
+              reducedMotion={reducedMotion}
+              pauseMotion={pauseMotion}
+            />
+          )}
+        </Canvas>
+      ) : (
+        <div
+          aria-hidden
+          className="h-full w-full bg-[radial-gradient(circle_at_35%_30%,rgba(255,255,255,0.10),transparent_55%),radial-gradient(circle_at_70%_70%,rgba(96,216,255,0.10),transparent_60%)]"
         />
-        {variant === "premium" ? (
-          <PremiumBonsaiScene reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
-        ) : (
-          <FreeCassetteScene neon={palette.neon} reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
-        )}
-      </Canvas>
+      )}
     </div>
   );
 }

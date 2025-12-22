@@ -3,13 +3,18 @@ import { useEffect, useRef, useState } from "react";
 type SceneActivityOptions = {
   rootMargin?: string;
   scrollDebounceMs?: number;
+  initialInView?: boolean;
 };
 
 export function useSceneActivity(options?: SceneActivityOptions) {
-  const { rootMargin = "200px 0px", scrollDebounceMs = 160 } = options ?? {};
+  const {
+    rootMargin = "200px 0px",
+    scrollDebounceMs = 160,
+    initialInView = true,
+  } = options ?? {};
 
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [inView, setInView] = useState(true);
+  const [inView, setInView] = useState(initialInView);
   const [isScrolling, setIsScrolling] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
 
@@ -56,4 +61,3 @@ export function useSceneActivity(options?: SceneActivityOptions) {
     active: inView && isVisible && !isScrolling,
   };
 }
-
