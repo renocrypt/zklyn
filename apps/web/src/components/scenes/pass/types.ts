@@ -3,3 +3,6 @@ export type SceneMotionProps = {
   pauseMotion?: boolean;
 };
 
+export type CardSceneProps = SceneMotionProps & {
+  neon: string;
+};

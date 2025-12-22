@@ -31,6 +31,7 @@ import {
   TREASURY_ADDRESS,
   USDC_ADDRESS,
 } from "@/config/web3";
+import { PASS_SCENE_DEFINITIONS } from "@/components/scenes/registry";
 
 const HeroScene = dynamic(() => import("@/components/scenes/hero-scene"), {
   ssr: false,
@@ -485,67 +486,42 @@ export default function Home() {
         </section>
 
         <section id="free" className="grid gap-6 lg:grid-cols-2">
-          <Card className={panelClass}>
-            <CardHeader>
-              <CardTitle className="text-lg">Free Gallery</CardTitle>
-              <CardDescription>
-                {freeBalance > 0n
-                  ? "You have access to the base spatial gallery."
-                  : freeClaimed
-                  ? "Already claimed (transferable)."
-                  : "One per wallet. Instant access."}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm text-muted-foreground">
-              <div className="h-60 overflow-hidden rounded-2xl border border-white/10 bg-black/40">
-                <PassScene
-                  variant="free"
-                  reducedMotion={prefersReducedMotion}
-                />
-              </div>
-              <div className="flex flex-wrap gap-2 text-xs">
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-                  Ambient scene
-                </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-                  Spatial audio
-                </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-                  Gallery loop
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card id="premium" className={panelClass}>
-            <CardHeader>
-              <CardTitle className="text-lg">Premium Vault</CardTitle>
-              <CardDescription>
-                {premiumBalance > 0n
-                  ? "Premium assets unlocked."
-                  : "Mint premium to unlock this vault."}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm text-muted-foreground">
-              <div className="h-60 overflow-hidden rounded-2xl border border-white/10 bg-black/40">
-                <PassScene
-                  variant="premium"
-                  reducedMotion={prefersReducedMotion}
-                />
-              </div>
-              <div className="flex flex-wrap gap-2 text-xs">
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-                  Ultra assets
-                </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-                  Alternate lighting
-                </span>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
-                  Hidden gallery
-                </span>
-              </div>
-            </CardContent>
-          </Card>
+          {PASS_SCENE_DEFINITIONS.map((definition) => (
+            <Card
+              key={definition.id}
+              id={definition.anchorId}
+              className={panelClass}
+            >
+              <CardHeader>
+                <CardTitle className="text-lg">{definition.title}</CardTitle>
+                <CardDescription>
+                  {definition.getDescription({
+                    freeBalance,
+                    premiumBalance,
+                    freeClaimed,
+                  })}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm text-muted-foreground">
+                <div className="h-60 overflow-hidden rounded-2xl border border-white/10 bg-black/40">
+                  <PassScene
+                    id={definition.id}
+                    reducedMotion={prefersReducedMotion}
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  {definition.chips.map((chip) => (
+                    <span
+                      key={chip}
+                      className="rounded-full border border-white/10 bg-white/5 px-3 py-1"
+                    >
+                      {chip}
+                    </span>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </section>
       </main>
     </div>

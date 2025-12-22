@@ -1,6 +1,7 @@
 "use client";
 
 import { Canvas } from "@react-three/fiber";
+import { Suspense } from "react";
 
 import {
   applyAcesToneMapping,
@@ -9,66 +10,54 @@ import {
 } from "./lib/canvas-presets";
 import { FrameLimiter } from "./lib/frame-limiter";
 import { useSceneActivity } from "./lib/use-scene-activity";
-import { FreeCassetteScene } from "./pass/free-cassette";
-import { PremiumBonsaiScene } from "./pass/premium-bonsai";
+import { getPassSceneDefinition, type PassSceneId } from "./registry";
 
 type PassSceneProps = {
-  variant: "free" | "premium";
+  id: PassSceneId;
   reducedMotion?: boolean;
 };
 
-const palettes = {
-  free: {
-    sky: "#0b0f16",
-    neon: "#60d8ff",
-  },
-  premium: {
-    sky: "#000000",
-    neon: "#f59e0b",
-  },
-};
-
-export default function PassScene({ variant, reducedMotion }: PassSceneProps) {
-  const palette = palettes[variant];
+export default function PassScene({ id, reducedMotion }: PassSceneProps) {
+  const definition = getPassSceneDefinition(id);
   const { containerRef, inView, active } = useSceneActivity({ initialInView: false });
   const pauseMotion = reducedMotion || !active;
-  const camera =
-    variant === "free"
-      ? { position: [0, 0.2, 6.2] as [number, number, number], fov: 42 }
-      : { position: [3.2, 2.4, 3.2] as [number, number, number], zoom: 70 };
+  const SceneComponent = definition.scene;
 
   return (
     <div ref={containerRef} className="h-full w-full">
       {inView ? (
         <Canvas
-          orthographic={variant === "premium"}
-          camera={camera}
+          orthographic={definition.orthographic}
+          camera={definition.camera}
           dpr={CARD_CANVAS_PRESET.dpr}
           gl={CARD_CANVAS_PRESET.gl}
           frameloop={CARD_CANVAS_PRESET.frameloop}
           onCreated={({ gl }) => {
-            if (variant === "premium") {
-              applyReinhardToneMapping(gl, 1.0);
+            if (definition.toneMapping.kind === "reinhard") {
+              applyReinhardToneMapping(gl, definition.toneMapping.exposure);
             } else {
-              applyAcesToneMapping(gl, 1.15);
+              applyAcesToneMapping(gl, definition.toneMapping.exposure);
             }
           }}
         >
-          <color attach="background" args={[palette.sky]} />
-          {variant === "free" && <fog attach="fog" args={[palette.sky, 4.5, 9]} />}
+          <color attach="background" args={[definition.palette.sky]} />
+          {definition.fog && (
+            <fog
+              attach="fog"
+              args={[definition.palette.sky, definition.fog.near, definition.fog.far]}
+            />
+          )}
           <FrameLimiter
             fps={reducedMotion ? CARD_CANVAS_PRESET.fps.reduced : CARD_CANVAS_PRESET.fps.normal}
             active={active}
           />
-          {variant === "premium" ? (
-            <PremiumBonsaiScene reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
-          ) : (
-            <FreeCassetteScene
-              neon={palette.neon}
+          <Suspense fallback={null}>
+            <SceneComponent
+              neon={definition.palette.neon}
               reducedMotion={reducedMotion}
               pauseMotion={pauseMotion}
             />
-          )}
+          </Suspense>
         </Canvas>
       ) : (
         <div

@@ -5,7 +5,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 
 import { createSeededRng } from "../lib/rng";
-import type { SceneMotionProps } from "./types";
+import type { CardSceneProps, SceneMotionProps } from "./types";
 
 type PulseType = "red" | "green" | null;
 
@@ -356,7 +356,7 @@ function ContentRoot({ reducedMotion, pauseMotion }: SceneMotionProps) {
   );
 }
 
-export function PremiumBonsaiScene({ reducedMotion, pauseMotion }: SceneMotionProps) {
+export function PremiumBonsaiScene({ reducedMotion, pauseMotion }: CardSceneProps) {
   return (
     <>
       <BonsaiLightRig reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
@@ -364,4 +364,3 @@ export function PremiumBonsaiScene({ reducedMotion, pauseMotion }: SceneMotionPr
     </>
   );
 }
-

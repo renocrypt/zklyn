@@ -4,7 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 
-import type { SceneMotionProps } from "./types";
+import type { CardSceneProps, SceneMotionProps } from "./types";
 
 type VoxelCassetteProps = SceneMotionProps;
 
@@ -219,7 +219,7 @@ export function FreeCassetteScene({
   neon,
   reducedMotion,
   pauseMotion,
-}: { neon: string } & SceneMotionProps) {
+}: CardSceneProps) {
   return (
     <>
       <LightRig neon={neon} reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
@@ -227,4 +227,3 @@ export function FreeCassetteScene({
     </>
   );
 }
-
