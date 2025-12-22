@@ -26,7 +26,35 @@ Update `.env.local` with the deployed AccessPass address.
 ```bash
 npm run dev
 npm run build
+npm run check
 ```
+
+## 3D scenes (R3F)
+
+3D visuals are implemented with React Three Fiber (R3F) and split into small modules:
+
+- `src/components/scenes/hero-scene.tsx` → hero canvas orchestrator
+  - `src/components/scenes/hero/*` → hero scene modules (backdrop, lights, ramen)
+- `src/components/scenes/pass-scene.tsx` → card canvas orchestrator (Free/Premium)
+  - `src/components/scenes/pass/*` → per-card scene modules (cassette, bonsai)
+- `src/components/scenes/lib/*` → shared helpers (`useSceneActivity`, `FrameLimiter`, presets, RNG)
+- `src/components/scenes/registry.ts` → single source of truth for card scenes (UI labels + render config)
+
+### Adding a new card scene
+
+1. Create a new scene module under `src/components/scenes/pass/` that exports a React component accepting
+   `CardSceneProps` (`src/components/scenes/pass/types.ts`).
+2. Add an entry to `src/components/scenes/registry.ts`:
+   - `id`, `title`, `chips`, `getDescription(...)`
+   - `palette`, `camera`, `toneMapping`, optional `fog`
+   - `scene: lazy(() => import("./pass/<your-file>").then(...))`
+3. The page renders cards from `PASS_SCENE_DEFINITIONS`, so your new card will appear automatically.
+
+### Performance notes
+
+- Card canvases are lazy-mounted only when in view (avoids extra WebGL contexts offscreen).
+- All canvases use `frameloop="demand"` + `FrameLimiter` to target a lower FPS (and pause while scrolling/tab hidden).
+- Avoid heavy postprocessing (bloom/composer) for small card scenes.
 
 ## Deployment notes
 
