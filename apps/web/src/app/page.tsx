@@ -233,8 +233,13 @@ export default function Home() {
       setError("No wallet connector available.");
       return;
     }
-    await connect({ connector });
-    setShowConnectors(false);
+    try {
+      await connect({ connector });
+      setShowConnectors(false);
+    } catch (err: unknown) {
+      console.error(err);
+      setError(formatWalletError(err));
+    }
   };
 
   const handleClaimFree = async () => {
