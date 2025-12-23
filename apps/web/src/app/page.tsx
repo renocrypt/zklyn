@@ -24,6 +24,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { FloatingNav } from "@/components/floating-nav";
+import { LockOverlay } from "@/components/lock-overlay";
 import { accessPassAbi, erc20Abi } from "@/lib/abis";
 import {
   ACCESS_PASS_ADDRESS,
@@ -48,7 +49,7 @@ const steps = [
 ];
 
 const panelClass =
-  "relative overflow-hidden border border-white/15 bg-black/30 shadow-[0_32px_90px_rgba(2,6,20,0.55)] before:pointer-events-none before:absolute before:inset-0 before:bg-[linear-gradient(120deg,rgba(255,255,255,0.08),transparent_55%)]";
+  "relative overflow-hidden border border-white/10 bg-black/30 shadow-[0_32px_90px_rgba(2,6,20,0.55)] before:pointer-events-none before:absolute before:inset-0 before:bg-[linear-gradient(120deg,rgba(255,255,255,0.08),transparent_55%)]";
 const pillClass =
   "rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[0.6rem] uppercase tracking-[0.25em]";
 
@@ -100,6 +101,7 @@ export default function Home() {
   const [status, setStatus] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [showConnectors, setShowConnectors] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   const accessPassAddress = ACCESS_PASS_ADDRESS
     ? (ACCESS_PASS_ADDRESS as `0x${string}`)
@@ -116,6 +118,7 @@ export default function Home() {
   const prefersReducedMotion = useReducedMotion() ?? false;
 
   const needsChainSwitch = isConnected && chainId !== base.id;
+  const isOnBase = isConnected && chainId === base.id;
   const canTransact =
     isConnected && !needsChainSwitch && Boolean(accessPassAddress);
 
@@ -202,6 +205,10 @@ export default function Home() {
   );
 
   const needsApproval = allowance < premiumPrice;
+  const hasFreePass = freeBalance > 0n;
+  const hasPremiumPass = premiumBalance > 0n;
+  const canClaimFree = canTransact && !freeClaimed && freeBalance === 0n;
+  const showVault = Boolean(accessPassAddress);
 
   const networkLabel = !isConnected
     ? "Not connected"
@@ -306,6 +313,76 @@ export default function Home() {
     }
   };
 
+  const scrollToMint = () => {
+    document.getElementById("mint")?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const scrollToVault = () => {
+    document.getElementById("free")?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const scrollToPremium = () => {
+    document.getElementById("premium")?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const primaryCta = (() => {
+    if (!isConnected) {
+      return {
+        label: isConnecting ? "Connecting…" : "Connect to Enter",
+        disabled: isConnecting || connectors.length === 0,
+        onClick: () => handleConnect(),
+      };
+    }
+
+    if (needsChainSwitch) {
+      return {
+        label: isSwitching ? "Switching…" : "Switch to Base",
+        disabled: isSwitching,
+        onClick: () => switchChain({ chainId: base.id }),
+      };
+    }
+
+    if (!accessPassAddress) {
+      return {
+        label: "Contract not configured",
+        disabled: true,
+        onClick: () => undefined,
+      };
+    }
+
+    if (canClaimFree) {
+      return {
+        label: isWriting ? "Claiming…" : "Claim Free Pass",
+        disabled: isWriting,
+        onClick: handleClaimFree,
+      };
+    }
+
+    if (!hasPremiumPass) {
+      if (needsApproval) {
+        return {
+          label: isWriting
+            ? "Approving…"
+            : `Approve USDC ($${premiumPriceLabel})`,
+          disabled: isWriting || !canTransact,
+          onClick: handleApprove,
+        };
+      }
+
+      return {
+        label: isWriting ? "Minting…" : `Mint Premium ($${premiumPriceLabel})`,
+        disabled: isWriting || !canTransact,
+        onClick: handleMintPremium,
+      };
+    }
+
+    return {
+      label: "Enter the Vault",
+      disabled: false,
+      onClick: () => (hasPremiumPass ? scrollToPremium() : scrollToVault()),
+    };
+  })();
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_oklch(0.22_0.08_265/0.7),_transparent_55%),_radial-gradient(circle_at_20%_10%,_oklch(0.32_0.18_300/0.35),_transparent_60%),_linear-gradient(160deg,_oklch(0.08_0.02_260),_oklch(0.06_0.02_265))]">
       <div
@@ -338,8 +415,11 @@ export default function Home() {
         networkBadgeClass={networkBadgeClass}
       />
 
-      <main className="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-16 px-4 pb-20 pt-28 sm:px-6 lg:gap-20 lg:px-8 lg:pt-32">
-        <section id="mint" className="grid items-center gap-12 lg:grid-cols-[1.15fr_0.85fr]">
+      <main className="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-16 px-4 pb-20 pt-28 sm:px-6 lg:gap-28 lg:px-8 lg:pt-32">
+        <section
+          id="mint"
+          className="grid items-center gap-12 lg:min-h-[85vh] lg:grid-cols-[1.15fr_0.85fr]"
+        >
           <div className="flex flex-col gap-6">
             <div className="flex flex-wrap items-center gap-3 text-[0.65rem] uppercase tracking-[0.35em] text-muted-foreground">
               <span className={pillClass}>Base mainnet</span>
@@ -361,67 +441,62 @@ export default function Home() {
               a free pass once per wallet, or mint a premium pass in USDC to unlock
               the full vault.
             </p>
-            <div className="flex flex-wrap gap-3">
-              <Button
-                size="lg"
-                onClick={handleClaimFree}
-                disabled={!canTransact || freeClaimed || isWriting || isSwitching}
-              >
-                {freeClaimed ? "Free pass claimed" : "Claim Free Pass"}
-              </Button>
-              <Button
-                size="lg"
-                variant="secondary"
-                onClick={needsApproval ? handleApprove : handleMintPremium}
-                disabled={!canTransact || isWriting || isSwitching}
-              >
-                {needsApproval
-                  ? `Approve USDC (${premiumPriceLabel})`
-                  : `Mint Premium ($${premiumPriceLabel})`}
-              </Button>
-            </div>
-            {needsChainSwitch && (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">
-                You are connected to the wrong network. Switch to Base mainnet to
-                continue.
-                <div className="mt-3">
+
+            <div className="flex flex-col items-start gap-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  size="lg"
+                  onClick={primaryCta.onClick}
+                  disabled={primaryCta.disabled}
+                >
+                  {primaryCta.label}
+                </Button>
+                {showVault && (
                   <Button
-                    size="sm"
+                    size="lg"
                     variant="outline"
-                    onClick={() => switchChain({ chainId: base.id })}
-                    disabled={isSwitching}
+                    onClick={scrollToVault}
+                    disabled={!showVault}
                   >
-                    {isSwitching ? "Switching…" : "Switch to Base"}
+                    View vault
                   </Button>
-                </div>
+                )}
               </div>
-            )}
-            {!accessPassAddress && (
-              <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-4 text-sm text-muted-foreground">
-                Add the AccessPass contract address to
-                <span className="font-semibold"> NEXT_PUBLIC_ACCESS_PASS_ADDRESS</span>
-                to enable minting.
+
+              <div className="flex flex-wrap items-center gap-4 text-sm">
+                <button
+                  type="button"
+                  onClick={() => setShowDetails((prev) => !prev)}
+                  className="text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+                >
+                  {showDetails ? "Hide details" : "View wallet & mint details"}
+                </button>
+                {(status || error) && (
+                  <div className="flex flex-wrap gap-3">
+                    {status && (
+                      <span className="text-muted-foreground">{status}</span>
+                    )}
+                    {error && <span className="text-destructive">{error}</span>}
+                  </div>
+                )}
               </div>
-            )}
-            {(status || error) && (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm">
-                {status && <p className="text-foreground">{status}</p>}
-                {error && <p className="text-destructive">{error}</p>}
-              </div>
-            )}
-            <div className="flex flex-wrap gap-6 text-xs text-muted-foreground">
-              <div>
-                <p className="uppercase tracking-[0.3em]">USDC Balance</p>
-                <p className="text-base text-foreground">{usdcBalanceLabel}</p>
-              </div>
-              <div>
-                <p className="uppercase tracking-[0.3em]">Treasury</p>
-                <p className="text-base text-foreground">{shortenAddress(treasuryAddress)}</p>
-              </div>
-              <div>
-                <p className="uppercase tracking-[0.3em]">USDC</p>
-                <p className="text-base text-foreground">{shortenAddress(USDC_ADDRESS)}</p>
-              </div>
+
+              {isConnected && needsChainSwitch && (
+                <p className="text-sm text-muted-foreground">
+                  Connected to {networkLabel}. Switch to Base to continue.
+                </p>
+              )}
+
+              {isConnected && !accessPassAddress && (
+                <p className="text-sm text-muted-foreground">
+                  Missing <span className="font-semibold">AccessPass</span>{" "}
+                  address. Set{" "}
+                  <span className="font-semibold">
+                    NEXT_PUBLIC_ACCESS_PASS_ADDRESS
+                  </span>{" "}
+                  and redeploy the site.
+                </p>
+              )}
             </div>
           </div>
 
@@ -433,96 +508,222 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <Card className={panelClass}>
-            <CardHeader>
-              <CardTitle className="text-lg">Mint Flow</CardTitle>
-              <CardDescription>
-                Everything happens in your wallet. No backend.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <ol className="space-y-3 text-sm text-muted-foreground">
-                {steps.map((step, index) => (
-                  <li key={step} className="flex items-center gap-3">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 text-xs font-semibold text-foreground">
-                      {index + 1}
-                    </span>
-                    <span>{step}</span>
-                  </li>
-                ))}
-              </ol>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-muted-foreground">
-                Premium holders unlock extra scenes, assets, and experimental
-                renders.
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className={panelClass}>
-            <CardHeader>
-              <CardTitle className="text-lg">Pass Snapshot</CardTitle>
-              <CardDescription>Live reads from Base mainnet.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm text-muted-foreground">
-              <div className="flex items-center justify-between">
-                <span>Free pass balance</span>
-                <span className="text-foreground">{freeBalance.toString()}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Premium pass balance</span>
-                <span className="text-foreground">{premiumBalance.toString()}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Premium price</span>
-                <span className="text-foreground">${premiumPriceLabel}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Wallet</span>
-                <span className="text-foreground">{shortenAddress(address)}</span>
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-
-        <section id="free" className="grid gap-6 lg:grid-cols-2">
-          {PASS_SCENE_DEFINITIONS.map((definition) => (
-            <Card
-              key={definition.id}
-              id={definition.anchorId}
-              className={panelClass}
-            >
+        {showDetails && (
+          <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+            <Card className={panelClass}>
               <CardHeader>
-                <CardTitle className="text-lg">{definition.title}</CardTitle>
+                <CardTitle className="text-lg">Mint Flow</CardTitle>
                 <CardDescription>
-                  {definition.getDescription({
-                    freeBalance,
-                    premiumBalance,
-                    freeClaimed,
-                  })}
+                  Everything happens in your wallet. No backend.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4 text-sm text-muted-foreground">
-                <div className="h-60 overflow-hidden rounded-2xl border border-white/10 bg-black/40">
-                  <PassScene
-                    id={definition.id}
-                    reducedMotion={prefersReducedMotion}
-                  />
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs">
-                  {definition.chips.map((chip) => (
-                    <span
-                      key={chip}
-                      className="rounded-full border border-white/10 bg-white/5 px-3 py-1"
-                    >
-                      {chip}
-                    </span>
+              <CardContent className="space-y-4">
+                <ol className="space-y-3 text-sm text-muted-foreground">
+                  {steps.map((step, index) => (
+                    <li key={step} className="flex items-center gap-3">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/15 text-xs font-semibold text-foreground">
+                        {index + 1}
+                      </span>
+                      <span>{step}</span>
+                    </li>
                   ))}
+                </ol>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-muted-foreground">
+                  Premium holders unlock extra scenes, assets, and experimental
+                  renders.
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </section>
+
+            <Card className={panelClass}>
+              <CardHeader>
+                <CardTitle className="text-lg">Pass Snapshot</CardTitle>
+                <CardDescription>
+                  {isOnBase ? "Live reads from Base mainnet." : "Connect on Base to view."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm text-muted-foreground">
+                <div className="flex items-center justify-between">
+                  <span>Free pass balance</span>
+                  <span className="text-foreground">
+                    {isOnBase ? freeBalance.toString() : "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Premium pass balance</span>
+                  <span className="text-foreground">
+                    {isOnBase ? premiumBalance.toString() : "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Premium price</span>
+                  <span className="text-foreground">${premiumPriceLabel}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>USDC balance</span>
+                  <span className="text-foreground">
+                    {isOnBase ? usdcBalanceLabel : "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Treasury</span>
+                  <span className="text-foreground">
+                    {shortenAddress(treasuryAddress)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>USDC</span>
+                  <span className="text-foreground">
+                    {shortenAddress(USDC_ADDRESS)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Wallet</span>
+                  <span className="text-foreground">
+                    {shortenAddress(address)}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        )}
+
+        {showVault && (
+          <section id="free" className="grid gap-6 lg:grid-cols-2">
+            {PASS_SCENE_DEFINITIONS.map((definition) => {
+              const lockedByTier =
+                definition.tier === "free" ? !hasFreePass : !hasPremiumPass;
+              const locked = !isConnected || needsChainSwitch || lockedByTier;
+
+              const overlay = (() => {
+                if (!isConnected) {
+                  return {
+                    title: "Connect to unlock",
+                    description: "Connect a wallet to verify access.",
+                    actionLabel: isConnecting ? "Connecting…" : "Connect wallet",
+                    onAction: () => handleConnect(),
+                    disabled: isConnecting || connectors.length === 0,
+                    variant: "outline" as const,
+                  };
+                }
+
+                if (needsChainSwitch) {
+                  return {
+                    title: "Switch to Base",
+                    description: "Switch networks to continue.",
+                    actionLabel: isSwitching ? "Switching…" : "Switch to Base",
+                    onAction: () => switchChain({ chainId: base.id }),
+                    disabled: isSwitching,
+                    variant: "outline" as const,
+                  };
+                }
+
+                if (definition.tier === "free") {
+                  if (freeClaimed && !hasFreePass) {
+                    return {
+                      title: "Free pass missing",
+                      description:
+                        "This wallet already claimed a pass, but it isn't held here. Passes are transferable.",
+                      actionLabel: "View details",
+                      onAction: () => {
+                        setShowDetails(true);
+                        scrollToMint();
+                      },
+                      disabled: false,
+                      variant: "outline" as const,
+                    };
+                  }
+
+                  return {
+                    title: "Access Restricted",
+                    description: "Claim a Free Pass to enter the gallery.",
+                    actionLabel: isWriting ? "Claiming…" : "Claim Free Pass",
+                    onAction: handleClaimFree,
+                    disabled: isWriting || !canClaimFree,
+                    variant: "outline" as const,
+                  };
+                }
+
+                if (needsApproval) {
+                  return {
+                    title: "Premium Vault",
+                    description: "Approve USDC to mint Premium.",
+                    actionLabel: isWriting
+                      ? "Approving…"
+                      : `Approve USDC ($${premiumPriceLabel})`,
+                    onAction: handleApprove,
+                    disabled: isWriting || !canTransact,
+                    variant: "default" as const,
+                  };
+                }
+
+                const hasEnoughUsdc = usdcBalance >= premiumPrice;
+
+                return {
+                  title: "Premium Vault",
+                  description: hasEnoughUsdc
+                    ? "Mint Premium to unlock."
+                    : `Insufficient USDC (need $${premiumPriceLabel}).`,
+                  actionLabel: isWriting
+                    ? "Minting…"
+                    : `Mint Premium ($${premiumPriceLabel})`,
+                  onAction: handleMintPremium,
+                  disabled: isWriting || !canTransact || !hasEnoughUsdc,
+                  variant: "default" as const,
+                };
+              })();
+
+              return (
+                <Card
+                  key={definition.id}
+                  id={definition.anchorId}
+                  className={panelClass}
+                >
+                  <CardHeader>
+                    <CardTitle className="text-lg">{definition.title}</CardTitle>
+                    <CardDescription>
+                      {definition.getDescription({
+                        freeBalance,
+                        premiumBalance,
+                        freeClaimed,
+                      })}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4 text-sm text-muted-foreground">
+                    <div className="relative h-60 overflow-hidden rounded-2xl border border-white/10 bg-black/40">
+                      <PassScene
+                        id={definition.id}
+                        reducedMotion={prefersReducedMotion}
+                      />
+                      {locked && (
+                        <LockOverlay
+                          title={overlay.title}
+                          description={overlay.description}
+                          actionLabel={overlay.actionLabel}
+                          onAction={overlay.onAction}
+                          disabled={overlay.disabled}
+                          variant={overlay.variant}
+                        />
+                      )}
+                    </div>
+                    <div
+                      className={`flex flex-wrap gap-2 text-xs ${locked ? "opacity-60" : ""}`}
+                    >
+                      {definition.chips.map((chip) => (
+                        <span
+                          key={chip}
+                          className="rounded-full border border-white/10 bg-white/5 px-3 py-1"
+                        >
+                          {chip}
+                        </span>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </section>
+        )}
       </main>
     </div>
   );

@@ -2,6 +2,13 @@ import { render, screen } from '@testing-library/react'
 import Home from '@/app/page'
 import * as wagmi from 'wagmi'
 
+jest.mock('@/config/web3', () => ({
+  ACCESS_PASS_ADDRESS: '0x1111111111111111111111111111111111111111',
+  USDC_ADDRESS: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+  TREASURY_ADDRESS: '0x73871971f79673b8a57a48fb9e13a4ab7b25222e',
+  PREMIUM_PRICE_FALLBACK: 100000000n,
+}))
+
 jest.mock('@/components/floating-nav', () => ({
   FloatingNav: () => null,
 }))
@@ -36,6 +43,8 @@ const mockUseSwitchChain = wagmi.useSwitchChain as jest.Mock
 const mockUseWriteContract = wagmi.useWriteContract as jest.Mock
 
 const setupWagmiMocks = (overrides?: Partial<{
+  isConnected: boolean
+  chainId: number
   freeClaimed: boolean
   freeBalance: bigint
   premiumBalance: bigint
@@ -44,6 +53,8 @@ const setupWagmiMocks = (overrides?: Partial<{
   allowance: bigint
 }>) => {
   const state = {
+    isConnected: true,
+    chainId: 8453,
     freeClaimed: false,
     freeBalance: 0n,
     premiumBalance: 0n,
@@ -54,10 +65,10 @@ const setupWagmiMocks = (overrides?: Partial<{
   }
 
   mockUseAccount.mockReturnValue({
-    address: '0x1111111111111111111111111111111111111111',
-    isConnected: true,
+    address: state.isConnected ? '0x1111111111111111111111111111111111111111' : undefined,
+    isConnected: state.isConnected,
   })
-  mockUseChainId.mockReturnValue(8453)
+  mockUseChainId.mockReturnValue(state.chainId)
   mockUseConnect.mockReturnValue({
     connect: jest.fn(),
     connectors: [{ id: 'injected', name: 'Injected' }],
@@ -112,6 +123,25 @@ test('shows free gallery unlocked when free pass is owned', () => {
   expect(
     screen.getByText('Mint premium to unlock this vault.')
   ).toBeInTheDocument()
+})
+
+test('shows the vault locked when disconnected', () => {
+  setupWagmiMocks({ isConnected: false })
+  render(<Home />)
+  expect(
+    screen.getByRole('button', { name: /connect to enter/i })
+  ).toBeInTheDocument()
+  expect(screen.getByText('Free Gallery')).toBeInTheDocument()
+  expect(screen.getByText('Premium Vault')).toBeInTheDocument()
+  expect(screen.getAllByRole('button', { name: /connect wallet/i })).toHaveLength(2)
+})
+
+test('shows the vault and prompts network switch on wrong chain', () => {
+  setupWagmiMocks({ chainId: 1 })
+  render(<Home />)
+  expect(screen.getAllByRole('button', { name: /switch to base/i }).length).toBeGreaterThan(0)
+  expect(screen.getByText('Free Gallery')).toBeInTheDocument()
+  expect(screen.getByText('Premium Vault')).toBeInTheDocument()
 })
 
 test('renders futurist hero heading', () => {

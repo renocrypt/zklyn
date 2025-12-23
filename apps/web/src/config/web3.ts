@@ -19,7 +19,15 @@ export const ACCESS_PASS_ADDRESS = normalizeAddress(
   process.env.NEXT_PUBLIC_ACCESS_PASS_ADDRESS
 );
 
-const premiumPriceRaw = process.env.NEXT_PUBLIC_PREMIUM_PRICE || "100000000";
-export const PREMIUM_PRICE_FALLBACK = BigInt(premiumPriceRaw);
+const premiumPriceRaw = (process.env.NEXT_PUBLIC_PREMIUM_PRICE ?? "100000000").trim();
+let premiumPriceFallback = 100000000n;
+try {
+  premiumPriceFallback = BigInt(premiumPriceRaw);
+} catch {
+  console.warn(
+    "Invalid NEXT_PUBLIC_PREMIUM_PRICE (expected an integer string like 100000000). Using fallback."
+  );
+}
+export const PREMIUM_PRICE_FALLBACK = premiumPriceFallback;
 
 export const BASE_CHAIN_ID = 8453;
