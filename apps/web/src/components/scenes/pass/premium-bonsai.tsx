@@ -1,11 +1,14 @@
 "use client";
 
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
 import { createSeededRng } from "../lib/rng";
-import type { CardSceneProps, SceneMotionProps } from "./types";
+import type { CardSceneProps, PassSceneCanvasConfig, SceneMotionProps } from "./types";
 
 type PulseType = "red" | "green" | null;
 
@@ -15,6 +18,67 @@ type Voxel = {
   z: number;
   color: THREE.Color;
 };
+
+export const passSceneCanvas: PassSceneCanvasConfig = {
+  background: "#000000",
+  toneMapping: { kind: "reinhard", exposure: 1.0 },
+  camera: { position: [15, 5, 15], zoom: 60, near: 0.1, far: 1000 },
+};
+
+function SubtleBloom({ reducedMotion }: { reducedMotion?: boolean }) {
+  const { gl, scene, camera, size, invalidate } = useThree();
+  const composer = useRef<EffectComposer | null>(null);
+  const bloom = useRef<UnrealBloomPass | null>(null);
+
+  useEffect(() => {
+    if (reducedMotion) return undefined;
+
+    const renderPass = new RenderPass(scene, camera);
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(1, 1),
+      0.35,
+      0.45,
+      0.35
+    );
+    bloom.current = bloomPass;
+
+    const nextComposer = new EffectComposer(gl);
+    nextComposer.addPass(renderPass);
+    nextComposer.addPass(bloomPass);
+
+    composer.current = nextComposer;
+
+    const initialSize = gl.getSize(new THREE.Vector2());
+    nextComposer.setSize(initialSize.x, initialSize.y);
+    bloomPass.setSize(initialSize.x * 0.5, initialSize.y * 0.5);
+    invalidate();
+
+    return () => {
+      bloomPass.dispose();
+      nextComposer.dispose();
+      composer.current = null;
+      bloom.current = null;
+    };
+  }, [camera, gl, invalidate, reducedMotion, scene]);
+
+  useEffect(() => {
+    if (!composer.current) return;
+    composer.current.setSize(size.width, size.height);
+    bloom.current?.setSize(size.width * 0.5, size.height * 0.5);
+    invalidate();
+  }, [invalidate, size.height, size.width]);
+
+  useFrame(() => {
+    if (composer.current) {
+      composer.current.render();
+      return;
+    }
+
+    if (!reducedMotion) gl.render(scene, camera);
+  }, reducedMotion ? 0 : 1);
+
+  return null;
+}
 
 function NeonVoxelBonsai({ reducedMotion, pauseMotion }: SceneMotionProps) {
   const bonsai = useRef<THREE.Group>(null!);
@@ -287,7 +351,7 @@ function NeonVoxelBonsai({ reducedMotion, pauseMotion }: SceneMotionProps) {
     const t = clock.getElapsedTime();
 
     if (!reducedMotion) {
-      bonsai.current.position.y = Math.sin(t) * 0.08;
+      bonsai.current.position.y = -center.y + Math.sin(t) * 0.08;
     }
 
     if (reducedMotion) return;
@@ -310,7 +374,7 @@ function NeonVoxelBonsai({ reducedMotion, pauseMotion }: SceneMotionProps) {
   });
 
   return (
-    <group ref={bonsai} position={[-center.x, -center.y, -center.z]} scale={0.95}>
+    <group ref={bonsai} position={[-center.x, -center.y - 0.6, -center.z]} scale={0.95}>
       <instancedMesh
         ref={instanced}
         args={[geometry, material, voxels.length]}
@@ -323,18 +387,38 @@ function NeonVoxelBonsai({ reducedMotion, pauseMotion }: SceneMotionProps) {
 
 function BonsaiLightRig({ reducedMotion, pauseMotion }: SceneMotionProps) {
   const rim = useRef<THREE.DirectionalLight>(null!);
+  const underglow = useRef<THREE.PointLight>(null!);
+  const magenta = useRef<THREE.PointLight>(null!);
 
   useFrame(({ clock }) => {
     if (reducedMotion || pauseMotion) return;
-    rim.current.intensity = 1.0 + Math.sin(clock.getElapsedTime() * 0.6) * 0.15;
+    const t = clock.getElapsedTime();
+    rim.current.intensity = 1.05 + Math.sin(t * 0.6) * 0.18;
+    underglow.current.intensity = 0.8 + Math.sin(t * 0.9 + 1.2) * 0.12;
+    magenta.current.intensity = 0.55 + Math.sin(t * 0.7 + 2.1) * 0.1;
   });
 
   return (
     <>
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[10, 20, 10]} intensity={1.35} color="#ffffff" />
-      <directionalLight ref={rim} position={[-20, 10, -20]} intensity={1.0} color="#4466ff" />
-      <pointLight position={[0, 12, 0]} intensity={0.55} color="#ff80ab" />
+      <hemisphereLight intensity={0.42} color="#60d8ff" groundColor="#120015" />
+      <directionalLight position={[8, 12, 8]} intensity={1.1} color="#fff5e7" />
+      <directionalLight ref={rim} position={[-10, 6, -12]} intensity={1.05} color="#4466ff" />
+      <pointLight
+        ref={underglow}
+        position={[0, -2.3, 3.2]}
+        intensity={0.8}
+        distance={30}
+        decay={2}
+        color="#00ffff"
+      />
+      <pointLight
+        ref={magenta}
+        position={[-2.6, 1.4, 1.4]}
+        intensity={0.55}
+        distance={24}
+        decay={2}
+        color="#ff80ab"
+      />
     </>
   );
 }
@@ -359,8 +443,11 @@ function ContentRoot({ reducedMotion, pauseMotion }: SceneMotionProps) {
 export function PremiumBonsaiScene({ reducedMotion, pauseMotion }: CardSceneProps) {
   return (
     <>
+      <SubtleBloom reducedMotion={reducedMotion} />
       <BonsaiLightRig reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
       <ContentRoot reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
     </>
   );
 }
+
+export default PremiumBonsaiScene;

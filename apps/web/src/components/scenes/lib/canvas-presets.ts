@@ -15,14 +15,14 @@ export const HERO_CANVAS_PRESET: CanvasPreset = {
   dpr: [1, 1.2],
   gl: { alpha: true, antialias: false, powerPreference: "low-power" },
   frameloop: "demand",
-  fps: { normal: 24, reduced: 12 },
+  fps: { normal: 24, reduced: 0 },
 };
 
 export const CARD_CANVAS_PRESET: CanvasPreset = {
   dpr: [1, 1.2],
   gl: { alpha: true, antialias: false, powerPreference: "low-power" },
   frameloop: "demand",
-  fps: { normal: 24, reduced: 12 },
+  fps: { normal: 24, reduced: 0 },
 };
 
 export function applyAcesToneMapping(gl: THREE.WebGLRenderer, exposure: number) {

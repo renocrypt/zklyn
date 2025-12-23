@@ -1,12 +1,73 @@
 "use client";
 
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
-import type { CardSceneProps, SceneMotionProps } from "./types";
+import type { CardSceneProps, PassSceneCanvasConfig, SceneMotionProps } from "./types";
 
 type VoxelCassetteProps = SceneMotionProps;
+
+export const passSceneCanvas: PassSceneCanvasConfig = {
+  background: "#000000",
+  toneMapping: { kind: "aces", exposure: 1.15 },
+  camera: { position: [0, 0.2, 6.2], fov: 42, near: 0.1, far: 80 },
+};
+
+function SubtleBloom() {
+  const { gl, scene, camera, size, invalidate } = useThree();
+  const composer = useRef<EffectComposer | null>(null);
+  const bloom = useRef<UnrealBloomPass | null>(null);
+
+  useEffect(() => {
+    const renderPass = new RenderPass(scene, camera);
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(1, 1),
+      0.28,
+      0.4,
+      0.4
+    );
+    bloom.current = bloomPass;
+
+    const nextComposer = new EffectComposer(gl);
+    nextComposer.addPass(renderPass);
+    nextComposer.addPass(bloomPass);
+    composer.current = nextComposer;
+
+    const initialSize = gl.getSize(new THREE.Vector2());
+    nextComposer.setSize(initialSize.x, initialSize.y);
+    bloomPass.setSize(initialSize.x * 0.5, initialSize.y * 0.5);
+    invalidate();
+
+    return () => {
+      bloomPass.dispose();
+      nextComposer.dispose();
+      composer.current = null;
+      bloom.current = null;
+    };
+  }, [camera, gl, invalidate, scene]);
+
+  useEffect(() => {
+    if (!composer.current) return;
+    composer.current.setSize(size.width, size.height);
+    bloom.current?.setSize(size.width * 0.5, size.height * 0.5);
+    invalidate();
+  }, [invalidate, size.height, size.width]);
+
+  useFrame(() => {
+    if (composer.current) {
+      composer.current.render();
+      return;
+    }
+
+    gl.render(scene, camera);
+  }, 1);
+
+  return null;
+}
 
 function VoxelCassette({ reducedMotion, pauseMotion }: VoxelCassetteProps) {
   const tape = useRef<THREE.Group>(null!);
@@ -222,8 +283,11 @@ export function FreeCassetteScene({
 }: CardSceneProps) {
   return (
     <>
+      {!reducedMotion && <SubtleBloom />}
       <LightRig neon={neon} reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
       <ContentRoot reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
     </>
   );
 }
+
+export default FreeCassetteScene;

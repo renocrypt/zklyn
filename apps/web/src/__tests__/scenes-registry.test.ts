@@ -12,20 +12,10 @@ describe("pass scene registry", () => {
     }
   });
 
-  it("has sane camera config per entry", () => {
+  it("has sane palette + loader per entry", () => {
     for (const definition of PASS_SCENE_DEFINITIONS) {
-      const camera = definition.camera as Record<string, unknown>;
-      const hasFov = "fov" in camera;
-      const hasZoom = "zoom" in camera;
-
-      expect(hasFov || hasZoom).toBe(true);
-      expect(hasFov && hasZoom).toBe(false);
-
-      if (definition.orthographic) {
-        expect(hasZoom).toBe(true);
-      } else {
-        expect(hasFov).toBe(true);
-      }
+      expect(definition.palette.neon).toMatch(/^#[0-9a-fA-F]{6}$/);
+      expect(typeof definition.load).toBe("function");
     }
   });
 
@@ -54,4 +44,3 @@ describe("pass scene registry", () => {
     ).toBe("Mint premium to unlock this vault.");
   });
 });
-

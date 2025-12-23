@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     title: "zklyn — Spatial Access Pass",
     description:
       "Unlock a spatial art experience with a one‑time onchain access pass. Claim free or mint premium to enter the vault.",
-    url: "https://zklyn.com",
+    url: "https://zklyn.renocrypt.com",
     siteName: "zklyn",
     images: [
       {

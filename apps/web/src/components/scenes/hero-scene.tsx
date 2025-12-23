@@ -28,51 +28,58 @@ const HERO_CAMERA = {
 const HERO_CAMERA_TARGET = [0, 3.5, 0] as [number, number, number];
 
 export default function HeroScene({ reducedMotion }: HeroSceneProps) {
-  const { containerRef, active } = useSceneActivity();
+  const { containerRef, inView, active } = useSceneActivity();
   const pauseMotion = reducedMotion || !active;
   const canvasKey = `${HERO_CAMERA.position.join(",")}-${HERO_CAMERA.fov}-${HERO_CAMERA.near}-${HERO_CAMERA.far}-${HERO_CAMERA_TARGET.join(",")}`;
 
   return (
     <div ref={containerRef} className="h-full w-full">
-      <Canvas
-        key={canvasKey}
-        camera={HERO_CAMERA}
-        dpr={HERO_CANVAS_PRESET.dpr}
-        gl={HERO_CANVAS_PRESET.gl}
-        frameloop={HERO_CANVAS_PRESET.frameloop}
-        onCreated={({ gl, camera }) => {
-          applyAcesToneMapping(gl, 1.3);
+      {inView ? (
+        <Canvas
+          key={canvasKey}
+          camera={HERO_CAMERA}
+          dpr={HERO_CANVAS_PRESET.dpr}
+          gl={HERO_CANVAS_PRESET.gl}
+          frameloop={HERO_CANVAS_PRESET.frameloop}
+          onCreated={({ gl, camera }) => {
+            applyAcesToneMapping(gl, 1.3);
 
-          camera.position.set(
-            HERO_CAMERA.position[0],
-            HERO_CAMERA.position[1],
-            HERO_CAMERA.position[2]
-          );
+            camera.position.set(
+              HERO_CAMERA.position[0],
+              HERO_CAMERA.position[1],
+              HERO_CAMERA.position[2]
+            );
 
-          if ("isPerspectiveCamera" in camera && (camera as THREE.PerspectiveCamera).isPerspectiveCamera) {
-            const perspective = camera as THREE.PerspectiveCamera;
-            perspective.fov = HERO_CAMERA.fov;
-            perspective.near = HERO_CAMERA.near;
-            perspective.far = HERO_CAMERA.far;
-            perspective.updateProjectionMatrix();
-          }
+            if ("isPerspectiveCamera" in camera && (camera as THREE.PerspectiveCamera).isPerspectiveCamera) {
+              const perspective = camera as THREE.PerspectiveCamera;
+              perspective.fov = HERO_CAMERA.fov;
+              perspective.near = HERO_CAMERA.near;
+              perspective.far = HERO_CAMERA.far;
+              perspective.updateProjectionMatrix();
+            }
 
-          camera.lookAt(
-            HERO_CAMERA_TARGET[0],
-            HERO_CAMERA_TARGET[1],
-            HERO_CAMERA_TARGET[2]
-          );
-        }}
-      >
-        <color attach="background" args={[palette.sky]} />
-        <FrameLimiter
-          fps={reducedMotion ? HERO_CANVAS_PRESET.fps.reduced : HERO_CANVAS_PRESET.fps.normal}
-          active={active}
+            camera.lookAt(
+              HERO_CAMERA_TARGET[0],
+              HERO_CAMERA_TARGET[1],
+              HERO_CAMERA_TARGET[2]
+            );
+          }}
+        >
+          <color attach="background" args={[palette.sky]} />
+          <FrameLimiter
+            fps={reducedMotion ? HERO_CANVAS_PRESET.fps.reduced : HERO_CANVAS_PRESET.fps.normal}
+            active={active}
+          />
+          <IridescentBackdrop reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
+          <HeroLightRig reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
+          <VoxelRamen reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
+        </Canvas>
+      ) : (
+        <div
+          aria-hidden
+          className="h-full w-full bg-[radial-gradient(circle_at_35%_30%,rgba(255,255,255,0.10),transparent_55%),radial-gradient(circle_at_70%_70%,rgba(96,216,255,0.10),transparent_60%)]"
         />
-        <IridescentBackdrop reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
-        <HeroLightRig reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
-        <VoxelRamen reducedMotion={reducedMotion} pauseMotion={pauseMotion} />
-      </Canvas>
+      )}
     </div>
   );
 }

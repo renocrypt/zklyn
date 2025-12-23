@@ -12,6 +12,7 @@
 - Free claim rule: one free claim per wallet via mapping (freeClaimed[address]).
 - Premium mint requires USDC transferFrom to treasury, then mint.
 - Premium price adjustable via owner-only setPremiumPrice without redeploy.
+- Owner controls: setTreasury and setURI.
 - Transferable/resellable tokens (default ERC-1155 behavior).
 - Web app is static-only (Next.js SSG/export), no backend.
 - Content gating is UI-only; optional client-side decryption allowed but not required.
@@ -19,6 +20,7 @@
 ## Tech & data
 - Contracts: Solidity, Foundry, OpenZeppelin.
 - Frontend: TypeScript, Next.js (static export), shadcn/ui, wagmi/viem, three.js.
+- Wallet connectivity: injected + optional WalletConnect; Base mainnet transactions.
 - Hosting: GitHub Pages (static assets).
 - Data sources: Base RPC via wallet provider; USDC contract on Base.
 

@@ -1,0 +1,19 @@
+{
+  "name": "zklyn — Free Pass",
+  "description": "Unlock the zklyn spatial art experience. Free Pass grants access to the Free Gallery. One free claim per wallet; transferable.",
+  "image": "ipfs://bafybeia5rmewbtcwzc5bvaw5lbjbms3fkgtecyloaqappl6znrzq4t5cuu/free.png",
+  "external_url": "https://zklyn.renocrypt.com",
+  "attributes": [
+    { "trait_type": "Tier", "value": "Free" },
+    { "trait_type": "Access", "value": "Free Gallery" }
+  ],
+  "properties": {
+    "files": [
+      {
+        "uri": "ipfs://bafybeia5rmewbtcwzc5bvaw5lbjbms3fkgtecyloaqappl6znrzq4t5cuu/free.png",
+        "type": "image/png"
+      }
+    ],
+    "category": "image"
+  }
+}

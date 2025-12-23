@@ -1,0 +1,21 @@
+{
+  "name": "zklyn — Premium Pass",
+  "description": "Unlock the full zklyn spatial vault. Premium Pass is minted for USDC on Base; transferable.",
+  "image": "ipfs://bafybeia5rmewbtcwzc5bvaw5lbjbms3fkgtecyloaqappl6znrzq4t5cuu/premium.png",
+  "external_url": "https://zklyn.renocrypt.com",
+  "attributes": [
+    { "trait_type": "Tier", "value": "Premium" },
+    { "trait_type": "Access", "value": "Premium Vault" },
+    { "trait_type": "Payment", "value": "USDC" },
+    { "trait_type": "Chain", "value": "Base" }
+  ],
+  "properties": {
+    "files": [
+      {
+        "uri": "ipfs://bafybeia5rmewbtcwzc5bvaw5lbjbms3fkgtecyloaqappl6znrzq4t5cuu/premium.png",
+        "type": "image/png"
+      }
+    ],
+    "category": "image"
+  }
+}
