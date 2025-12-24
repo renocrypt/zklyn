@@ -700,7 +700,7 @@ export default function Home() {
                         id={definition.id}
                         reducedMotion={prefersReducedMotion}
                       />
-                      {locked && (
+                      {locked && !isConnecting && (
                         <LockOverlay
                           title={overlay.title}
                           description={overlay.description}
